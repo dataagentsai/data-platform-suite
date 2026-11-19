@@ -1,0 +1,92 @@
+# Slice 1 ("orders, source to silver", plus gold and a metric view) on Databricks.
+#
+#   cd realms/databricks
+#   databricks bundle deploy -p free
+#   ../../scripts/run_slice1.sh            # reset, then one job run per world day (1..7), then the evidence
+#
+# Free Edition: serverless only, one workspace, so environments are separated by schema (dp_<env>_*), not workspace.
+bundle:
+  name: dp_slice1
+
+variables:
+  env:
+    default: dev
+  catalog:
+    default: workspace
+
+sync:
+  paths:
+    - ../../src/dataplatform
+    - .
+
+targets:
+  dev:
+    default: true
+    mode: development
+
+resources:
+  pipelines:
+    dp_silver:
+      name: dp-${var.env}-silver-orders
+      catalog: ${var.catalog}
+      schema: dp_${var.env}_silver
+      serverless: true
+      continuous: false
+      libraries:
+        - file:
+            path: ./pipelines/silver.py
+      configuration:
+        dp.meta: ${var.catalog}.dp_${var.env}_meta
+        dp.source: shop_db
+        dp.dataset: orders
+
+  jobs:
+    dp_slice1_day:
+      name: dp-${var.env}-slice1-day
+      max_concurrent_runs: 1
+      parameters:
+        - name: day
+          default: "1"
+      environments:
+        - environment_key: default
+          spec:
+            environment_version: "3"
+      tasks:
+        - task_key: prepare
+          environment_key: default
+          spark_python_task:
+            python_file: ./tasks/main.py
+            parameters: [--step, prepare, --day, "{{job.parameters.day}}", --run-id, "{{job.run_id}}",
+                         --env, "${var.env}", --catalog, "${var.catalog}", --root, "${workspace.file_path}"]
+        - task_key: land
+          depends_on: [{task_key: prepare}]
+          environment_key: default
+          spark_python_task:
+            python_file: ./tasks/main.py
+            parameters: [--step, land, --day, "{{job.parameters.day}}", --run-id, "{{job.run_id}}",
+                         --env, "${var.env}", --catalog, "${var.catalog}", --root, "${workspace.file_path}"]
+        - task_key: silver
+          depends_on: [{task_key: land}]
+          pipeline_task:
+            pipeline_id: ${resources.pipelines.dp_silver.id}
+        - task_key: finish
+          depends_on: [{task_key: silver}]
+          environment_key: default
+          spark_python_task:
+            python_file: ./tasks/main.py
+            parameters: [--step, finish, --day, "{{job.parameters.day}}", --run-id, "{{job.run_id}}",
+                         --env, "${var.env}", --catalog, "${var.catalog}", --root, "${workspace.file_path}"]
+
+    dp_slice1_reset:
+      name: dp-${var.env}-slice1-reset
+      environments:
+        - environment_key: default
+          spec:
+            environment_version: "3"
+      tasks:
+        - task_key: reset
+          environment_key: default
+          spark_python_task:
+            python_file: ./tasks/main.py
+            parameters: [--step, reset, --env, "${var.env}", --catalog, "${var.catalog}",
+                         --root, "${workspace.file_path}"]

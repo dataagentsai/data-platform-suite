@@ -1,0 +1,54 @@
+# The declarative silver engine (ADR-035) on Databricks: one generic pipeline over the metadata store.
+#   databricks bundle deploy -p free && databricks bundle run silver_declarative -p free
+bundle:
+  name: dp_silver_declarative
+
+sync:
+  paths:
+    - ../../../src/dataplatform
+    - .
+
+variables:
+  env:
+    default: dev
+  only:
+    default: "erp.sales_order_line"   # proof run: these datasets; empty = every dataset with silver_engine declarative
+  target_schema:
+    default: declarative_proof
+  bronze_catalog:
+    default: ""                        # empty = <env>_bronze; a proof may point at a scratch copy
+
+targets:
+  dev:
+    default: true
+    mode: development
+  qproof:                              # quarantine proof: a scratch bronze copy with planted bad rows
+    mode: development
+    variables:
+      only: erp.sales_order_line
+      target_schema: declarative_qproof
+      bronze_catalog: dev_ops
+
+resources:
+  pipelines:
+    silver_declarative:
+      name: dp-${var.env}-silver-declarative-${bundle.target}
+      catalog: ${var.env}_silver
+      schema: ${var.target_schema}
+      serverless: true
+      continuous: false
+      environment:
+        dependencies:
+          - "psycopg[binary]>=3.2"
+          - "pyyaml>=6"
+      libraries:
+        - file:
+            path: ./silver.py
+      configuration:
+        dp.root: ${workspace.file_path}
+        dp.env: ${var.env}
+        dp.domain: tyre
+        dp.only: ${var.only}
+        dp.meta_instance: dp-meta-dev
+        dp.meta_database: dp_meta_proof
+        dp.bronze_catalog: ${var.bronze_catalog}

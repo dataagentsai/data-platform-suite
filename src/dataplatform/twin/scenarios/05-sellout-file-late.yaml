@@ -1,0 +1,57 @@
+# DataTwin scenario (G10), day 5: Dealer D-0042's October file, due on day 1, arrives on day 5.
+# Oracle (world.yaml): October for D-0042 is published flagged incomplete until day 5, then rebuilt, marked complete
+# and logged as a restatement
+# FIXTURE note: the obs checks run on obs/fixture.py; ingestion and silver checks run on the engine when a
+# run of it is attached (tests/dataplatform/test_twin_engine.py); gold checks too since W1d; DES checks are pending (W1e).
+apiVersion: dwd-scenario/v0
+scenario: sellout-file-late
+incident: sellout-file-late
+story: late_data
+world: slices/02-tyre/world.yaml
+discharges:
+- LATE-01
+- DPC-0080
+- DPC-0059
+- DPC-0079
+- OPS-01
+- OPS-06
+checks:
+- id: planted
+  layer: world
+  kind: planted
+- id: shown
+  layer: obs
+  kind: on_dashboard
+  dashboard: freshness_slos
+  widget: breach_list
+  match:
+    dataset: partner.dealer_sellout
+    key: D-0042
+- id: one-alert
+  layer: obs
+  kind: one_alert
+  rule: freshness-breach
+  subject: partner.dealer_sellout/D-0042
+  fired_day: 1
+  resolved_day: 5
+- id: bookmarks
+  layer: ingestion
+  kind: engine
+  says: each dealer's bookmark moves only when its own file loads
+  expect: bookmark_moves
+  dataset: partner.dealer_sellout
+  key: D-0042
+  day: 5
+- id: restated
+  layer: gold
+  kind: engine
+  says: October for D-0042 is published flagged incomplete until day 5, then rebuilt, marked complete and logged as
+    a restatement (detect.LATE-01 in the run log)
+  expect: verdict
+  verdict: handled
+- id: complete-day-5
+  layer: gold
+  kind: engine
+  says: gold equals the oracle on day 5, October's completeness included
+  expect: totals
+  day: 5

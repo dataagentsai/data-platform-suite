@@ -1,0 +1,73 @@
+# The W1 engine (tyre domain) on Databricks Free Edition: Iceberg tables in Unity Catalog, metadata store on Lakebase.
+#
+#   cd realms/databricks/engine && databricks bundle deploy -p free
+#   databricks bundle run engine_probe -p free        # what serverless allows (cache, checkpoint, Iceberg writes)
+bundle:
+  name: dp_engine
+
+variables:
+  env:
+    default: dev
+  meta_instance:
+    default: dp-meta-dev
+
+sync:
+  paths:
+    - ../../../src/dataplatform
+    - ../../../scripts
+    - ../../../models/tyre
+    - ../semantic_governance/generated  # the business metric views and their known answers (B12)
+    - .                       # includes _catalog/ (the tyre slice, copied in before deploy)
+  include:
+    - _catalog/**             # git-ignored (a copy of data-platform-catalog/slices/02-tyre), so listed here
+
+targets:
+  dev:
+    default: true
+    mode: development
+
+resources:
+  jobs:
+    engine_probe:
+      name: dp-${var.env}-engine-probe
+      max_concurrent_runs: 1
+      environments:
+        - environment_key: default
+          spec:
+            environment_version: "3"
+            dependencies:
+              - "psycopg[binary]>=3.2"
+              - "pyyaml>=6"
+      tasks:
+        - task_key: probe
+          environment_key: default
+          spark_python_task:
+            python_file: ./tasks/probe.py
+            parameters: [--root, "${workspace.file_path}", --meta-instance, "${var.meta_instance}",
+                         --schema, "${var.env}_ops.engine_probe"]
+
+    engine_days:
+      name: dp-${var.env}-engine-days
+      max_concurrent_runs: 1
+      parameters:
+        - name: days
+          default: "3"
+        - name: calendar        # compressed = every planted incident on days 2-3 (the 3-day loop); "" = world's own
+          default: "compressed"
+        - name: housekeeping_days  # bronze housekeeping's correction window (B8); 1 on the compressed loop; "" = off
+          default: "1"
+      environments:
+        - environment_key: default
+          spec:
+            environment_version: "3"
+            dependencies:
+              - "psycopg[binary]>=3.2"
+              - "pyyaml>=6"
+      tasks:
+        - task_key: days
+          environment_key: default
+          spark_python_task:
+            python_file: ./tasks/run_days.py
+            parameters: [--days, "{{job.parameters.days}}", --calendar, "{{job.parameters.calendar}}",
+                         --housekeeping-days, "{{job.parameters.housekeeping_days}}", --env, "${var.env}", --meta-instance,
+                         "${var.meta_instance}", --run-id, "{{job.run_id}}", --root, "${workspace.file_path}"]

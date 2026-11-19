@@ -1,0 +1,48 @@
+# DataTwin scenario (G10), day 11: Orders for new dealer D-9001 start on day 11; the dealer appears in the interface
+# on day 13.
+# Oracle (world.yaml): no fact row is dropped; D-9001's lines sit on the unknown member (-1) and count as orphans on
+# days 11 and 12, then are re-keyed on day 13
+# FIXTURE note: the obs checks run on obs/fixture.py; ingestion and silver checks run on the engine when a
+# run of it is attached (tests/dataplatform/test_twin_engine.py); gold checks too since W1d; DES checks are pending (W1e).
+apiVersion: dwd-scenario/v0
+scenario: new-dealer-late
+incident: new-dealer-late
+story: late_dimension
+world: slices/02-tyre/world.yaml
+discharges:
+- LATE-02
+- DPC-0046
+- OPS-01
+- OPS-06
+checks:
+- id: planted
+  layer: world
+  kind: planted
+- id: shown
+  layer: obs
+  kind: on_dashboard
+  dashboard: platform_health
+  widget: steps_not_passed
+  match:
+    dataset: dealer_api.dealer
+    step: detect.LATE-02
+- id: one-alert
+  layer: obs
+  kind: one_alert
+  rule: detector-fired
+  subject: dealer_api.dealer/LATE-02
+  fired_day: 11
+  resolved_day: 13
+- id: unknown-member
+  layer: gold
+  kind: engine
+  says: no fact row is dropped; D-9001's lines sit on the unknown member (-1) as orphans on days 11 and 12, then are re-keyed
+    on day 13
+  expect: verdict
+  verdict: [flagged, handled]
+- id: re-keyed
+  layer: gold
+  kind: engine
+  says: on day 13 no line sits on the unknown member and gold equals the oracle
+  expect: totals
+  day: 13

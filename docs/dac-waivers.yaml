@@ -1,0 +1,27 @@
+# DAC waivers (B20 C20). A waiver counts only with a reason (10+ characters), who approved it and an end date
+# (scripts/dac_coverage.py). The entries below are PROPOSED: approved_by is empty until the owner signs them off,
+# so the coverage report does not count them yet.
+- id: HEAL-01
+  reason: Self-healing is phase P7; no self-healing fix exists yet to gate
+  approved_by: ""
+  until: "2027-03-31"
+- id: GATE-03
+  reason: Agents are phase P7 (W4 not started); no agent proposes changes yet
+  approved_by: ""
+  until: "2027-03-31"
+- id: ML-01
+  reason: No machine learning model in the tyre platform yet; only a manifest entry
+  approved_by: ""
+  until: "2027-03-31"
+- id: ORCH-06
+  reason: Streaming is on hold (batch first, row 16f); no stream to restart
+  approved_by: ""
+  until: "2027-03-31"
+- id: COST-02
+  reason: Cost guardrails belong to the separate cost product (ADR-024 rule 8); job tags are ours
+  approved_by: ""
+  until: "2027-03-31"
+- id: COST-03
+  reason: Cost tracing belongs to the separate cost product (ADR-024 rule 8); job tags are ours
+  approved_by: ""
+  until: "2027-03-31"

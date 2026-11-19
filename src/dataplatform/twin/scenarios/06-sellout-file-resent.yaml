@@ -1,0 +1,55 @@
+# DataTwin scenario (G10), day 6: Re-send D-0042's October file byte for byte under a new name.
+# Oracle (world.yaml): silver and fact_sales for D-0042 October are unchanged; no restatement is logged
+# FIXTURE note: the obs checks run on obs/fixture.py; ingestion and silver checks run on the engine when a
+# run of it is attached (tests/dataplatform/test_twin_engine.py); gold checks too since W1d; DES checks are pending (W1e).
+apiVersion: dwd-scenario/v0
+scenario: sellout-file-resent
+incident: sellout-file-resent
+story: resend
+world: slices/02-tyre/world.yaml
+discharges:
+- DUP-01
+- DPC-0024
+- DPC-0023
+- DPC-0038
+- OPS-01
+- OPS-06
+checks:
+- id: planted
+  layer: world
+  kind: planted
+- id: nothing-new
+  layer: world
+  kind: oracle
+  day: 6
+  path:
+  - bronze
+  - partner.dealer_sellout
+  equals: 0
+- id: shown
+  layer: obs
+  kind: on_dashboard
+  dashboard: sources_ingestion
+  widget: held_files
+  match:
+    dataset: partner.dealer_sellout
+    status: skipped_duplicate
+- id: one-alert
+  layer: obs
+  kind: one_alert
+  rule: detector-fired
+  subject: partner.dealer_sellout/DUP-01
+  fired_day: 6
+  resolved_day: 7
+- id: batch-key
+  layer: ingestion
+  kind: engine
+  says: the resent file's batch key is already loaded, so nothing is appended
+  expect: verdict
+  verdict: handled
+- id: unchanged
+  layer: gold
+  kind: engine
+  says: silver and fact_sales for D-0042 October are unchanged; no restatement is logged
+  expect: verdict
+  verdict: handled

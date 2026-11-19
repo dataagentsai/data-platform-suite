@@ -1,0 +1,483 @@
+{
+  "datasets": [
+    {
+      "displayName": "by kind",
+      "name": "des_data_expectations__by_kind",
+      "queryLines": [
+        "SELECT `day`, `kind`, MEASURE(`steps`) AS `steps`\n",
+        "FROM `dev_ops`.`ops`.`mv_ops_steps`\n",
+        "WHERE `owner` = 'des'\n",
+        "GROUP BY `day`, `kind`\n",
+        "ORDER BY `day`, `kind`"
+      ]
+    },
+    {
+      "displayName": "not passed daily",
+      "name": "des_data_expectations__not_passed_daily",
+      "queryLines": [
+        "SELECT `day`, `severity`, MEASURE(`steps`) AS `steps`\n",
+        "FROM `dev_ops`.`ops`.`mv_ops_steps`\n",
+        "WHERE `owner` = 'des' AND `passed` = FALSE\n",
+        "GROUP BY `day`, `severity`\n",
+        "ORDER BY `day`, `severity`"
+      ]
+    },
+    {
+      "displayName": "results",
+      "name": "des_data_expectations__results",
+      "queryLines": [
+        "SELECT `day`, `dataset`, `kind`, `step`, `severity`, `count`, `message`, `run_id`\n",
+        "FROM `dev_ops`.`ops`.`ops_steps`\n",
+        "WHERE `owner` = 'des'\n",
+        "ORDER BY `day` DESC"
+      ]
+    },
+    {
+      "displayName": "failed",
+      "name": "des_data_expectations__failed",
+      "queryLines": [
+        "SELECT `day`, `dataset`, `kind`, `step`, `severity`, `message`, `run_id`\n",
+        "FROM `dev_ops`.`ops`.`ops_steps`\n",
+        "WHERE `owner` = 'des' AND `passed` = FALSE\n",
+        "ORDER BY `day`"
+      ]
+    },
+    {
+      "displayName": "restated",
+      "name": "des_data_expectations__restated",
+      "queryLines": [
+        "SELECT `day`, `table`, `window`, `reason`, `measure`, `before`, `after`, `change`, `run_id`\n",
+        "FROM `dev_ops`.`ops`.`ops_restatements`\n",
+        "ORDER BY `day` DESC"
+      ]
+    }
+  ],
+  "pages": [
+    {
+      "displayName": "Data expectations",
+      "layout": [
+        {
+          "position": {
+            "height": 2,
+            "width": 6,
+            "x": 0,
+            "y": 0
+          },
+          "widget": {
+            "multilineTextboxSpec": {
+              "lines": [
+                "## Data expectations\n",
+                "\n",
+                "Is the data right? Quality rules, reconciliation between hops and profiles, each with its severity, owned by the data expectation services. W1e fills in the detail (failed rows, the hop and keys of a reconciliation entry, quarantine and release).\n",
+                "\n",
+                "Owned by data expectation services. Built from the ops metric views over the compact ops tables (run log, daily telemetry copy, freshness, alerts), joined by run id. Discharges DPC-0057, DQ-04, REC-01, SEV-01, RSTM-01."
+              ]
+            },
+            "name": "about"
+          }
+        },
+        {
+          "position": {
+            "height": 6,
+            "width": 3,
+            "x": 0,
+            "y": 2
+          },
+          "widget": {
+            "name": "checks_per_day",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "des_data_expectations__by_kind",
+                  "disaggregated": true,
+                  "fields": [
+                    {
+                      "expression": "`day`",
+                      "name": "day"
+                    },
+                    {
+                      "expression": "`steps`",
+                      "name": "steps"
+                    },
+                    {
+                      "expression": "`kind`",
+                      "name": "kind"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "encodings": {
+                "color": {
+                  "displayName": "kind",
+                  "fieldName": "kind",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "x": {
+                  "displayName": "day",
+                  "fieldName": "day",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "displayName": "steps",
+                  "fieldName": "steps",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Results per day by kind"
+              },
+              "version": 3,
+              "widgetType": "bar"
+            }
+          }
+        },
+        {
+          "position": {
+            "height": 6,
+            "width": 3,
+            "x": 3,
+            "y": 2
+          },
+          "widget": {
+            "name": "not_passed",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "des_data_expectations__not_passed_daily",
+                  "disaggregated": true,
+                  "fields": [
+                    {
+                      "expression": "`day`",
+                      "name": "day"
+                    },
+                    {
+                      "expression": "`steps`",
+                      "name": "steps"
+                    },
+                    {
+                      "expression": "`severity`",
+                      "name": "severity"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "encodings": {
+                "color": {
+                  "displayName": "severity",
+                  "fieldName": "severity",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "x": {
+                  "displayName": "day",
+                  "fieldName": "day",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "displayName": "steps",
+                  "fieldName": "steps",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Results not passed per day by severity"
+              },
+              "version": 3,
+              "widgetType": "bar"
+            }
+          }
+        },
+        {
+          "position": {
+            "height": 6,
+            "width": 6,
+            "x": 0,
+            "y": 8
+          },
+          "widget": {
+            "name": "failures",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "des_data_expectations__failed",
+                  "disaggregated": true,
+                  "fields": [
+                    {
+                      "expression": "`day`",
+                      "name": "day"
+                    },
+                    {
+                      "expression": "`dataset`",
+                      "name": "dataset"
+                    },
+                    {
+                      "expression": "`kind`",
+                      "name": "kind"
+                    },
+                    {
+                      "expression": "`step`",
+                      "name": "step"
+                    },
+                    {
+                      "expression": "`severity`",
+                      "name": "severity"
+                    },
+                    {
+                      "expression": "`message`",
+                      "name": "message"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "encodings": {
+                "columns": [
+                  {
+                    "displayName": "day",
+                    "fieldName": "day"
+                  },
+                  {
+                    "displayName": "dataset",
+                    "fieldName": "dataset"
+                  },
+                  {
+                    "displayName": "kind",
+                    "fieldName": "kind"
+                  },
+                  {
+                    "displayName": "step",
+                    "fieldName": "step"
+                  },
+                  {
+                    "displayName": "severity",
+                    "fieldName": "severity"
+                  },
+                  {
+                    "displayName": "message",
+                    "fieldName": "message"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Results not passed"
+              },
+              "version": 1,
+              "widgetType": "table"
+            }
+          }
+        },
+        {
+          "position": {
+            "height": 6,
+            "width": 6,
+            "x": 0,
+            "y": 14
+          },
+          "widget": {
+            "name": "results",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "des_data_expectations__results",
+                  "disaggregated": true,
+                  "fields": [
+                    {
+                      "expression": "`day`",
+                      "name": "day"
+                    },
+                    {
+                      "expression": "`dataset`",
+                      "name": "dataset"
+                    },
+                    {
+                      "expression": "`kind`",
+                      "name": "kind"
+                    },
+                    {
+                      "expression": "`step`",
+                      "name": "step"
+                    },
+                    {
+                      "expression": "`severity`",
+                      "name": "severity"
+                    },
+                    {
+                      "expression": "`count`",
+                      "name": "count"
+                    },
+                    {
+                      "expression": "`message`",
+                      "name": "message"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "encodings": {
+                "columns": [
+                  {
+                    "displayName": "day",
+                    "fieldName": "day"
+                  },
+                  {
+                    "displayName": "dataset",
+                    "fieldName": "dataset"
+                  },
+                  {
+                    "displayName": "kind",
+                    "fieldName": "kind"
+                  },
+                  {
+                    "displayName": "step",
+                    "fieldName": "step"
+                  },
+                  {
+                    "displayName": "severity",
+                    "fieldName": "severity"
+                  },
+                  {
+                    "displayName": "count",
+                    "fieldName": "count"
+                  },
+                  {
+                    "displayName": "message",
+                    "fieldName": "message"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Every result"
+              },
+              "version": 1,
+              "widgetType": "table"
+            }
+          }
+        },
+        {
+          "position": {
+            "height": 6,
+            "width": 6,
+            "x": 0,
+            "y": 20
+          },
+          "widget": {
+            "name": "restatements",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "des_data_expectations__restated",
+                  "disaggregated": true,
+                  "fields": [
+                    {
+                      "expression": "`day`",
+                      "name": "day"
+                    },
+                    {
+                      "expression": "`table`",
+                      "name": "table"
+                    },
+                    {
+                      "expression": "`window`",
+                      "name": "window"
+                    },
+                    {
+                      "expression": "`reason`",
+                      "name": "reason"
+                    },
+                    {
+                      "expression": "`measure`",
+                      "name": "measure"
+                    },
+                    {
+                      "expression": "`before`",
+                      "name": "before"
+                    },
+                    {
+                      "expression": "`after`",
+                      "name": "after"
+                    },
+                    {
+                      "expression": "`change`",
+                      "name": "change"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "encodings": {
+                "columns": [
+                  {
+                    "displayName": "day",
+                    "fieldName": "day"
+                  },
+                  {
+                    "displayName": "table",
+                    "fieldName": "table"
+                  },
+                  {
+                    "displayName": "window",
+                    "fieldName": "window"
+                  },
+                  {
+                    "displayName": "reason",
+                    "fieldName": "reason"
+                  },
+                  {
+                    "displayName": "measure",
+                    "fieldName": "measure"
+                  },
+                  {
+                    "displayName": "before",
+                    "fieldName": "before"
+                  },
+                  {
+                    "displayName": "after",
+                    "fieldName": "after"
+                  },
+                  {
+                    "displayName": "change",
+                    "fieldName": "change"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Published numbers that changed: window, reason, old and new (RSTM-01)"
+              },
+              "version": 1,
+              "widgetType": "table"
+            }
+          }
+        }
+      ],
+      "name": "des_data_expectations"
+    }
+  ]
+}

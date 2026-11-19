@@ -1,0 +1,356 @@
+{
+ "contract": {
+  "apiVersion": "v3.2.0",
+  "description": {
+   "limitations": "Orders only. Returns, payments and stock come in later slices.",
+   "purpose": "One row per order line as it stands now and as it stood before, for sales reporting."
+  },
+  "domain": "sales",
+  "id": "shop-orders-silver",
+  "kind": "DataContract",
+  "name": "Shop orders (silver)",
+  "schema": [
+   {
+    "dataGranularityDescription": "One row per order per version (history kept, one current row per order)",
+    "logicalType": "object",
+    "name": "orders",
+    "physicalName": "silver_orders",
+    "properties": [
+     {
+      "logicalType": "string",
+      "name": "order_id",
+      "primaryKey": true,
+      "primaryKeyPosition": 1,
+      "required": true
+     },
+     {
+      "classification": "restricted",
+      "logicalType": "string",
+      "name": "customer_id",
+      "required": true
+     },
+     {
+      "logicalType": "string",
+      "name": "store_id",
+      "required": true
+     },
+     {
+      "description": "When the order was placed, converted to the declared business time zone.",
+      "logicalType": "timestamp",
+      "name": "order_ts",
+      "required": true
+     },
+     {
+      "logicalType": "string",
+      "name": "status",
+      "quality": [
+       {
+        "arguments": {
+         "validValues": [
+          "placed",
+          "paid",
+          "shipped",
+          "delivered",
+          "cancelled"
+         ]
+        },
+        "dimension": "conformity",
+        "metric": "invalidValues",
+        "mustBe": 0,
+        "severity": "error",
+        "type": "library"
+       }
+      ],
+      "required": true
+     },
+     {
+      "logicalType": "number",
+      "name": "amount",
+      "quality": [
+       {
+        "description": "Amounts are never negative on an order (refunds are a different dataset).",
+        "dimension": "accuracy",
+        "mustBe": 0,
+        "query": "SELECT COUNT(*) FROM ${object} WHERE amount < 0",
+        "severity": "error",
+        "type": "sql"
+       }
+      ],
+      "required": true
+     },
+     {
+      "logicalType": "string",
+      "name": "currency",
+      "required": true
+     },
+     {
+      "description": "The source's change sequence. History is ordered by this, never by arrival (DPC-0025).",
+      "logicalType": "integer",
+      "name": "change_seq",
+      "required": true
+     }
+    ],
+    "quality": [
+     {
+      "arguments": {
+       "properties": [
+        "order_id",
+        "change_seq"
+       ]
+      },
+      "dimension": "uniqueness",
+      "metric": "duplicateValues",
+      "mustBe": 0,
+      "severity": "error",
+      "type": "library"
+     },
+     {
+      "dimension": "completeness",
+      "metric": "rowCount",
+      "mustBeGreaterThan": 0,
+      "severity": "error",
+      "type": "library"
+     }
+    ]
+   }
+  ],
+  "slaProperties": [
+   {
+    "property": "latency",
+    "unit": "h",
+    "value": 4
+   },
+   {
+    "property": "retention",
+    "unit": "y",
+    "value": 7
+   }
+  ],
+  "status": "draft",
+  "team": {
+   "members": [
+    {
+     "role": "owner",
+     "username": "orders-owner@example.org"
+    }
+   ],
+   "name": "shop-data"
+  },
+  "version": "0.1.0"
+ },
+ "dataset": {
+  "archetypes": [
+   "PA2"
+  ],
+  "bronze_table": "${bronze}.orders_changes",
+  "concerns": {},
+  "config": {
+   "load_type": "INCREMENTAL",
+   "schedule_timezone": "Asia/Kolkata",
+   "schedule_trigger": "on_delivery",
+   "sla_freshness_error_hours": "8",
+   "sla_freshness_hours": "4",
+   "watermark_column": "change_seq"
+  },
+  "contract_id": "shop-orders-silver",
+  "contract_version": "0.1.0",
+  "dataset_name": "orders",
+  "dedup": {
+   "business_keys": [
+    "order_id"
+   ],
+   "mode": "business_key_latest",
+   "order_by": "change_seq"
+  },
+  "gold_table": "${gold}.orders_daily",
+  "is_enabled": true,
+  "keys": [
+   "order_id"
+  ],
+  "load": {
+   "batch_key": [
+    "delivery_window",
+    "content_checksum"
+   ],
+   "deletes": {
+    "apply": "mark_deleted",
+    "detect": "change_feed"
+   },
+   "history_order_by": "change_seq",
+   "late_lookback_days": 30,
+   "new_columns": "hold_in_bronze",
+   "pattern": "history",
+   "quarantine_stop_share": 0.01
+  },
+  "owners": {
+   "alerts": "shop-data-rota",
+   "dataset": "orders-owner@example.org"
+  },
+  "quality_rules": {
+   "amount_present": "amount IS NOT NULL",
+   "amount_rule": "NOT (amount < 0)",
+   "change_seq_present": "change_seq IS NOT NULL",
+   "currency_present": "currency IS NOT NULL",
+   "customer_id_present": "customer_id IS NOT NULL",
+   "order_id_present": "order_id IS NOT NULL",
+   "order_ts_present": "order_ts IS NOT NULL",
+   "status_present": "status IS NOT NULL",
+   "status_valid": "status IN ('placed', 'paid', 'shipped', 'delivered', 'cancelled')",
+   "store_id_present": "store_id IS NOT NULL"
+  },
+  "quarantine_table": "${silver}.orders_quarantine",
+  "reconciliation": {
+   "hops": [
+    "sources",
+    "bronze",
+    "silver"
+   ],
+   "measures": [
+    {
+     "name": "row_count"
+    },
+    {
+     "column": "amount",
+     "name": "amount_total"
+    }
+   ],
+   "signed_off_by": "orders-owner@example.org",
+   "tolerance": {
+    "amount_total": 0.0,
+    "row_count": 0
+   }
+  },
+  "sequence_by": "change_seq",
+  "silver_table": "${silver}.orders",
+  "source_name": "shop_db",
+  "volume": {
+   "expected_rows_per_delivery": {
+    "max": 50000,
+    "min": 50
+   }
+  }
+ },
+ "world": {
+  "apiVersion": "dwd/v0",
+  "calendar": [
+   {
+    "day": 3,
+    "does": "Resend day 2's delivery under a new file name, byte for byte.",
+    "expect": {
+     "detector": "DUP-01",
+     "handled_by": [
+      "DPC-0024",
+      "DPC-0023"
+     ],
+     "oracle": "silver row count and amount total equal the world's truth for day 2"
+    },
+    "id": "same-batch-twice",
+    "kind": "duplicate_delivery"
+   },
+   {
+    "day": 4,
+    "does": "Hard-delete 3 cancelled orders from day 1 at the source.",
+    "expect": {
+     "detector": "DEL-01",
+     "handled_by": [
+      "DPC-0017"
+     ],
+     "oracle": "the 3 orders are marked deleted in silver and no longer counted as current"
+    },
+    "id": "cancelled-order-deleted",
+    "kind": "source_delete",
+    "pick": 3
+   },
+   {
+    "day": 5,
+    "does": "Deliver a status change for a day-2 order whose change sequence is older than a change already loaded.",
+    "expect": {
+     "detector": "SCD-02",
+     "handled_by": [
+      "DPC-0025",
+      "DPC-0026"
+     ],
+     "oracle": "the order has exactly one current row, holding the newest status by change sequence, with no overlapping periods"
+    },
+    "id": "late-status-change",
+    "kind": "late_change",
+    "pick": 1
+   },
+   {
+    "day": 6,
+    "does": "The source renames amount to order_amount in that day's delivery.",
+    "expect": {
+     "detector": "SCH-02",
+     "handled_by": [
+      "DPC-0008"
+     ],
+     "oracle": "the load stops with a message naming amount; silver is unchanged; no nulls loaded"
+    },
+    "id": "amount-renamed",
+    "kind": "renamed_column"
+   }
+  ],
+  "cites": {
+   "contract": {
+    "id": "shop-orders-silver",
+    "path": "contracts/orders.odcs.yaml",
+    "version": "0.1.0"
+   },
+   "manifest": {
+    "dataset": "orders",
+    "path": "manifest/orders.yaml",
+    "source": "shop_db"
+   }
+  },
+  "clock": {
+   "days": 7,
+   "delivery_at": "02:00",
+   "start": "2026-11-02 00:00:00+05:30"
+  },
+  "extends": "awd/v0",
+  "fidelity": {
+   "faithful_about": [
+    "order life cycle (placed, paid, shipped, delivered, cancelled) and the change sequence the source assigns",
+    "hard deletes of cancelled orders, which the source really does",
+    "deliveries arriving as files with a manifest, once a day"
+   ],
+   "not_faithful_about": [
+    "volume (hundreds of orders a day, not millions); performance is out of scope for this slice",
+    "customers, stores and products, which are ids only until their own slices"
+   ]
+  },
+  "name": "clothing-shop-orders",
+  "oracles": [
+   {
+    "check": "For every day, silver's current rows equal the world's true current orders (count, keys, amount total).",
+    "id": "silver-agrees-with-world"
+   },
+   {
+    "check": "Every calendar entry's detector fired on its day and on no clean day (SIM-01).",
+    "id": "every-incident-noticed"
+   }
+  ],
+  "population": {
+   "cancel_share": 0.05,
+   "generator": "faker",
+   "orders_per_day": {
+    "max": 400,
+    "min": 200
+   },
+   "status_flow": [
+    "placed",
+    "paid",
+    "shipped",
+    "delivered"
+   ]
+  },
+  "seed": 7,
+  "systems": {
+   "shop_db": {
+    "change_feed": true,
+    "projects": "source",
+    "resolution": "mock"
+   }
+  }
+ }
+}

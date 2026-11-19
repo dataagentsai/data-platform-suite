@@ -1,0 +1,84 @@
+# Test customer profile B — RAG / AI-focused, document-heavy
+#
+# A modern-stack customer building RAG / classic ML on top of unstructured
+# content. Sources are SaaS APIs + SharePoint document libraries. Heavy
+# emphasis on document ingestion, flattening of REST API JSON, and PII
+# tracking for HIPAA-style sensitive data.
+#
+# Used as a fixture in tests/examples/dummycustomerb/ to exercise the
+# DOCUMENT dataset_type, flattening engine routing, and SharePoint
+# substrate.
+
+# ─── Identity ──────────────────────────────────────────────────────────
+customer:
+  name: dummycustomerb
+  display_name: "DummyCustomer B, Ltd."
+  primary_contact: data@dummycustomerb.example
+  cost_center: "DC-B-AI-Platform"
+
+# ─── Environments ──────────────────────────────────────────────────────
+# Smaller environment count typical of newer / faster-moving teams.
+environments:
+  - name: dev
+    storage_account: dummycustomerbdevsa
+    container: lake
+    metadata_db_server: dummycustomerb-dev-sql.database.windows.net
+    metadata_db_database: lake_ingest_meta
+    region: eastus2
+  - name: prod
+    storage_account: dummycustomerbprodsa
+    container: lake
+    metadata_db_server: dummycustomerb-prod-sql.database.windows.net
+    metadata_db_database: lake_ingest_meta
+    region: eastus2
+
+# ─── Sources ───────────────────────────────────────────────────────────
+sources:
+  - source_type: sharepoint
+    connection_patterns: [app_only_cert]        # cert-based AAD app reg
+    requires_shir: false                        # cloud-only — Graph API is public-internet
+  - source_type: rest_api
+    connection_patterns: [oauth2_cc, oauth2_jwt]
+    requires_shir: false
+  - source_type: salesforce
+    connection_patterns: [oauth_jwt]            # ContentVersion + standard SObjects
+    requires_shir: false
+
+# ─── Features ──────────────────────────────────────────────────────────
+features:
+  segmented_loads: false                        # SaaS APIs don't need row-segmentation
+  flattening: true                              # heavily nested REST API JSON
+  document_dataset_type: true                   # PDFs, Word, HTML for RAG
+  cross_account_files: false                    # no cross-account ADLS
+  rest_api_generic: true                        # primary source mode
+  saas_apis: true                               # Salesforce branded + REST generic
+  cloud_dw: false
+  sap_hana: false
+  heartbeat_pipeline: true
+  auto_retry_on_partial: true                   # opt-in: PARTIAL master runs auto-retry
+  pii_classification: true                      # HIPAA-style sensitive content
+
+# ─── Constraints ───────────────────────────────────────────────────────
+constraints:
+  no_azure_functions: false                     # Functions allowed for flattening engine
+  no_databricks: false                          # Databricks workspace exists
+  msi_only: false                               # OAuth on SaaS APIs requires secrets
+  private_endpoint_required: true               # ADLS, KV, SQL all PE
+  cmk_required: true                            # PHI / PII requires CMK encryption
+  egress_to_internet: true                      # Graph API + Salesforce + REST require it
+  shir_only_for_onprem: true                    # but no on-prem sources here
+  no_public_blob_access: true
+
+# ─── Compliance ────────────────────────────────────────────────────────
+compliance:
+  pii_required: true
+  data_residency: eastus2
+  retention_minimum_days: 2555                  # ~7 years (HIPAA)
+  audit_log_retention_years: 7
+
+# ─── Slim trim preferences ─────────────────────────────────────────────
+trim:
+  include_runbooks: true
+  include_test_doctor: true
+  include_heartbeat_test: true
+  include_examples: true

@@ -1,0 +1,49 @@
+{# Per-environment platform_config. Generated once at `lake-ingest init`
+   from the profile; customer hand-edits afterwards. Read by
+   `lake-ingest config sync` and synced into the metadata DB. #}
+
+# Identity
+target_storage_account: {{ env.storage_account }}
+target_container_default: {{ env.container }}
+runtime_environment: {{ env.name }}
+
+# Realm + format
+default_realm: azure-databricks-adf
+default_file_format: PARQUET
+default_compression: snappy
+
+# Schedule
+default_schedule_cron: "0 2 * * *"
+default_batch_count: 10
+
+# Schema versioning
+metadata_schema_version: 1
+
+# Lifecycle tiering (Hot → Cool → Archive)
+lifecycle_cool_days: 30
+lifecycle_archive_days: 180
+
+# Heartbeat
+{% if features.heartbeat_pipeline -%}
+enable_heartbeat: true
+heartbeat_cron: "0 6 * * 1"  # weekly Mondays at 06:00 UTC
+{%- else -%}
+enable_heartbeat: false
+{%- endif %}
+
+# Auto-retry on PARTIAL master runs
+auto_retry_on_partial: {{ features.auto_retry_on_partial | tojson }}
+
+{% if features.segmented_loads -%}
+# Segmented-load thresholds
+large_table_row_threshold: 10000000
+huge_table_row_threshold: 1000000000
+{%- endif %}
+
+{% if requires_shir -%}
+# SHIR for on-prem source patterns
+shir_name: shir-{{ customer.name }}-{{ env.name }}
+{%- endif %}
+
+# Key Vault — fill this in before deploy
+# key_vault_uri: https://<vault>.vault.azure.net/

@@ -1,0 +1,71 @@
+# DataTwin scenario (G10), day 9: The daily full copy of materials comes back with 40% of rows missing.
+# Oracle (world.yaml): nothing is appended to bronze, the dataset is blocked with the mass-delete alert, silver
+# keeps every material
+# FIXTURE note: the obs checks run on obs/fixture.py; ingestion and silver checks run on the engine when a
+# run of it is attached (tests/dataplatform/test_twin_engine.py); gold checks too since W1d; DES checks are pending (W1e).
+apiVersion: dwd-scenario/v0
+scenario: material-copy-short
+incident: material-copy-short
+story: mass_delete
+world: slices/02-tyre/world.yaml
+discharges:
+- DEL-04
+- DPC-0054
+- OPS-01
+- OPS-06
+checks:
+- id: planted
+  layer: world
+  kind: planted
+- id: nothing-appended
+  layer: world
+  kind: oracle
+  day: 9
+  path:
+  - bronze
+  - erp.material
+  equals: 0
+- id: silver-keeps-all
+  layer: world
+  kind: oracle
+  day: 9
+  path:
+  - silver
+  - erp.material
+  - row_count
+  equals: 1800
+- id: shown
+  layer: obs
+  kind: on_dashboard
+  dashboard: sources_ingestion
+  widget: held_files
+  match:
+    dataset: erp.material
+    status: rejected_volume
+- id: blocked
+  layer: obs
+  kind: on_dashboard
+  dashboard: platform_health
+  widget: failed
+  match:
+    dataset: erp.material
+    status: skipped
+- id: one-alert
+  layer: obs
+  kind: one_alert
+  rule: detector-fired
+  subject: erp.material/DEL-04
+  fired_day: 9
+  resolved_day: 10
+- id: volume-block
+  layer: ingestion
+  kind: engine
+  says: nothing is appended to bronze and the dataset is blocked with the mass-delete alert
+  expect: verdict
+  verdict: handled
+- id: silver-keeps
+  layer: silver
+  kind: engine
+  says: silver keeps every material
+  expect: totals
+  day: 9

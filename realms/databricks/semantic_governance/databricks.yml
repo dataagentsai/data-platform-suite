@@ -1,0 +1,31 @@
+# The business dashboards over the certified metric views (generated/<domain>/<env>/bi, from generate.py). The engine
+# job creates the metric views after every proof run and checks their known answers against gold and the world
+# (engine/tasks/semantic_layer.py), so deploy this after a run:
+#
+#   cd realms/databricks/semantic_governance && databricks bundle deploy -p free
+#
+# The Genie space (generated/<domain>/<env>/bi/genie_space.json) is not a bundle resource; it is created through the
+# API when wanted.
+bundle:
+  name: dp_business_dashboards
+
+variables:
+  warehouse_id:
+    lookup:
+      warehouse: "Serverless Starter Warehouse"
+
+targets:
+  dev:
+    default: true
+    mode: development
+
+resources:
+  dashboards:
+    tyre_sales_metrics:
+      display_name: "Tyre - Sales metrics"
+      file_path: ./generated/tyre/dev/bi/sales_metrics.lvdash.json
+      warehouse_id: ${var.warehouse_id}
+    tyre_manufacturing_metrics:
+      display_name: "Tyre - Manufacturing metrics"
+      file_path: ./generated/tyre/dev/bi/manufacturing_metrics.lvdash.json
+      warehouse_id: ${var.warehouse_id}

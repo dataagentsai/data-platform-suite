@@ -1,0 +1,248 @@
+{
+  "datasets": [
+    {
+      "name": "mv_scrap_scrap_rate_counter_all",
+      "displayName": "Scrap rate %",
+      "queryLines": [
+        "SELECT MEASURE(`Scrap rate %`) AS value FROM `prod_gold`.`manufacturing`.`mv_scrap`"
+      ]
+    },
+    {
+      "name": "mv_scrap_scrap_rate_trend_day",
+      "displayName": "Scrap rate % by Day",
+      "queryLines": [
+        "SELECT `Day` AS dimension, MEASURE(`Scrap rate %`) AS value FROM `prod_gold`.`manufacturing`.`mv_scrap` GROUP BY ALL ORDER BY dimension"
+      ]
+    },
+    {
+      "name": "mv_scrap_scrap_rate_breakdown_plant",
+      "displayName": "Scrap rate % by Plant",
+      "queryLines": [
+        "SELECT `Plant` AS dimension, MEASURE(`Scrap rate %`) AS value FROM `prod_gold`.`manufacturing`.`mv_scrap` GROUP BY ALL ORDER BY dimension"
+      ]
+    },
+    {
+      "name": "mv_scrap_scrap_rate_breakdown_press",
+      "displayName": "Scrap rate % by Press",
+      "queryLines": [
+        "SELECT `Press` AS dimension, MEASURE(`Scrap rate %`) AS value FROM `prod_gold`.`manufacturing`.`mv_scrap` GROUP BY ALL ORDER BY dimension"
+      ]
+    }
+  ],
+  "pages": [
+    {
+      "name": "mv_scrap",
+      "displayName": "Scrap",
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layout": [
+        {
+          "widget": {
+            "name": "w_mv_scrap_scrap_rate_counter_all",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "mv_scrap_scrap_rate_counter_all",
+                  "fields": [
+                    {
+                      "name": "value",
+                      "expression": "`value`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "value",
+                  "displayName": "Scrap rate %"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Scrap rate %"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 2,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "w_mv_scrap_scrap_rate_trend_day",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "mv_scrap_scrap_rate_trend_day",
+                  "fields": [
+                    {
+                      "name": "dimension",
+                      "expression": "`dimension`"
+                    },
+                    {
+                      "name": "value",
+                      "expression": "`value`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "dimension",
+                  "displayName": "Day",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fieldName": "value",
+                  "displayName": "Scrap rate %",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Scrap rate % by Day"
+              }
+            }
+          },
+          "position": {
+            "x": 2,
+            "y": 0,
+            "width": 3,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "w_mv_scrap_scrap_rate_breakdown_plant",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "mv_scrap_scrap_rate_breakdown_plant",
+                  "fields": [
+                    {
+                      "name": "dimension",
+                      "expression": "`dimension`"
+                    },
+                    {
+                      "name": "value",
+                      "expression": "`value`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "dimension",
+                  "displayName": "Plant",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "value",
+                  "displayName": "Scrap rate %",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Scrap rate % by Plant"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 6,
+            "width": 3,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "w_mv_scrap_scrap_rate_breakdown_press",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "mv_scrap_scrap_rate_breakdown_press",
+                  "fields": [
+                    {
+                      "name": "dimension",
+                      "expression": "`dimension`"
+                    },
+                    {
+                      "name": "value",
+                      "expression": "`value`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "dimension",
+                  "displayName": "Press",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "value",
+                  "displayName": "Scrap rate %",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Scrap rate % by Press"
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 6,
+            "width": 3,
+            "height": 6
+          }
+        }
+      ]
+    }
+  ],
+  "uiSettings": {
+    "theme": {
+      "widgetHeaderAlignment": "LEFT"
+    }
+  }
+}

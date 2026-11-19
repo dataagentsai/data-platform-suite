@@ -1,0 +1,476 @@
+{
+  "datasets": [
+    {
+      "displayName": "files daily",
+      "name": "sources_ingestion__files_daily",
+      "queryLines": [
+        "SELECT `day`, MEASURE(`loaded`) AS `loaded`, MEASURE(`duplicate`) AS `duplicate`, MEASURE(`rejected`) AS `rejected`\n",
+        "FROM `dev_ops`.`ops`.`mv_ops_ingestion`\n",
+        "GROUP BY `day`\n",
+        "ORDER BY `day`"
+      ]
+    },
+    {
+      "displayName": "rows daily",
+      "name": "sources_ingestion__rows_daily",
+      "queryLines": [
+        "SELECT `day`, `source`, MEASURE(`rows`) AS `rows`\n",
+        "FROM `dev_ops`.`ops`.`mv_ops_dataset_runs`\n",
+        "GROUP BY `day`, `source`\n",
+        "ORDER BY `day`, `source`"
+      ]
+    },
+    {
+      "displayName": "held",
+      "name": "sources_ingestion__held",
+      "queryLines": [
+        "SELECT `day`, `dataset`, `file_name`, `status`, `rows`, `reason`, `run_id`\n",
+        "FROM `dev_ops`.`ops`.`ops_files_held`\n",
+        "ORDER BY `day`"
+      ]
+    },
+    {
+      "displayName": "by dataset",
+      "name": "sources_ingestion__by_dataset",
+      "queryLines": [
+        "SELECT `dataset`, MEASURE(`runs`) AS `runs`, MEASURE(`rows`) AS `rows`\n",
+        "FROM `dev_ops`.`ops`.`mv_ops_dataset_runs`\n",
+        "GROUP BY `dataset`\n",
+        "ORDER BY `dataset`"
+      ]
+    },
+    {
+      "displayName": "detectors",
+      "name": "sources_ingestion__detectors",
+      "queryLines": [
+        "SELECT `day`, `dataset`, `step`, `severity`, `count`, `message`, `run_id`\n",
+        "FROM `dev_ops`.`ops`.`ops_steps`\n",
+        "WHERE `kind` = 'detect'\n",
+        "ORDER BY `day`"
+      ]
+    }
+  ],
+  "pages": [
+    {
+      "displayName": "Sources and ingestion",
+      "layout": [
+        {
+          "position": {
+            "height": 2,
+            "width": 6,
+            "x": 0,
+            "y": 0
+          },
+          "widget": {
+            "multilineTextboxSpec": {
+              "lines": [
+                "## Sources and ingestion\n",
+                "\n",
+                "What arrived from each source, and what was held back? Files loaded, duplicates skipped and deliveries rejected, rows loaded per source, the reason for every file not loaded, and the detectors that met a load.\n",
+                "\n",
+                "Owned by observability. Built from the ops metric views over the compact ops tables (run log, daily telemetry copy, freshness, alerts), joined by run id. Discharges DPC-0057, BATCH-01."
+              ]
+            },
+            "name": "about"
+          }
+        },
+        {
+          "position": {
+            "height": 6,
+            "width": 3,
+            "x": 0,
+            "y": 2
+          },
+          "widget": {
+            "name": "rows",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "sources_ingestion__rows_daily",
+                  "disaggregated": true,
+                  "fields": [
+                    {
+                      "expression": "`day`",
+                      "name": "day"
+                    },
+                    {
+                      "expression": "`rows`",
+                      "name": "rows"
+                    },
+                    {
+                      "expression": "`source`",
+                      "name": "source"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "encodings": {
+                "color": {
+                  "displayName": "source",
+                  "fieldName": "source",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "x": {
+                  "displayName": "day",
+                  "fieldName": "day",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "displayName": "rows",
+                  "fieldName": "rows",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Rows loaded per day by source"
+              },
+              "version": 3,
+              "widgetType": "line"
+            }
+          }
+        },
+        {
+          "position": {
+            "height": 6,
+            "width": 3,
+            "x": 3,
+            "y": 2
+          },
+          "widget": {
+            "name": "rejected",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "sources_ingestion__files_daily",
+                  "disaggregated": true,
+                  "fields": [
+                    {
+                      "expression": "`day`",
+                      "name": "day"
+                    },
+                    {
+                      "expression": "`rejected`",
+                      "name": "rejected"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "encodings": {
+                "x": {
+                  "displayName": "day",
+                  "fieldName": "day",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "displayName": "rejected",
+                  "fieldName": "rejected",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Files rejected per day"
+              },
+              "version": 3,
+              "widgetType": "bar"
+            }
+          }
+        },
+        {
+          "position": {
+            "height": 6,
+            "width": 3,
+            "x": 0,
+            "y": 8
+          },
+          "widget": {
+            "name": "duplicates",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "sources_ingestion__files_daily",
+                  "disaggregated": true,
+                  "fields": [
+                    {
+                      "expression": "`day`",
+                      "name": "day"
+                    },
+                    {
+                      "expression": "`duplicate`",
+                      "name": "duplicate"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "encodings": {
+                "x": {
+                  "displayName": "day",
+                  "fieldName": "day",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "displayName": "duplicate",
+                  "fieldName": "duplicate",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Duplicate files skipped per day"
+              },
+              "version": 3,
+              "widgetType": "bar"
+            }
+          }
+        },
+        {
+          "position": {
+            "height": 6,
+            "width": 6,
+            "x": 0,
+            "y": 14
+          },
+          "widget": {
+            "name": "held_files",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "sources_ingestion__held",
+                  "disaggregated": true,
+                  "fields": [
+                    {
+                      "expression": "`day`",
+                      "name": "day"
+                    },
+                    {
+                      "expression": "`dataset`",
+                      "name": "dataset"
+                    },
+                    {
+                      "expression": "`file_name`",
+                      "name": "file_name"
+                    },
+                    {
+                      "expression": "`status`",
+                      "name": "status"
+                    },
+                    {
+                      "expression": "`rows`",
+                      "name": "rows"
+                    },
+                    {
+                      "expression": "`reason`",
+                      "name": "reason"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "encodings": {
+                "columns": [
+                  {
+                    "displayName": "day",
+                    "fieldName": "day"
+                  },
+                  {
+                    "displayName": "dataset",
+                    "fieldName": "dataset"
+                  },
+                  {
+                    "displayName": "file name",
+                    "fieldName": "file_name"
+                  },
+                  {
+                    "displayName": "status",
+                    "fieldName": "status"
+                  },
+                  {
+                    "displayName": "rows",
+                    "fieldName": "rows"
+                  },
+                  {
+                    "displayName": "reason",
+                    "fieldName": "reason"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Files not loaded, with the reason"
+              },
+              "version": 1,
+              "widgetType": "table"
+            }
+          }
+        },
+        {
+          "position": {
+            "height": 6,
+            "width": 6,
+            "x": 0,
+            "y": 20
+          },
+          "widget": {
+            "name": "detector_log",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "sources_ingestion__detectors",
+                  "disaggregated": true,
+                  "fields": [
+                    {
+                      "expression": "`day`",
+                      "name": "day"
+                    },
+                    {
+                      "expression": "`dataset`",
+                      "name": "dataset"
+                    },
+                    {
+                      "expression": "`step`",
+                      "name": "step"
+                    },
+                    {
+                      "expression": "`severity`",
+                      "name": "severity"
+                    },
+                    {
+                      "expression": "`count`",
+                      "name": "count"
+                    },
+                    {
+                      "expression": "`message`",
+                      "name": "message"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "encodings": {
+                "columns": [
+                  {
+                    "displayName": "day",
+                    "fieldName": "day"
+                  },
+                  {
+                    "displayName": "dataset",
+                    "fieldName": "dataset"
+                  },
+                  {
+                    "displayName": "step",
+                    "fieldName": "step"
+                  },
+                  {
+                    "displayName": "severity",
+                    "fieldName": "severity"
+                  },
+                  {
+                    "displayName": "count",
+                    "fieldName": "count"
+                  },
+                  {
+                    "displayName": "message",
+                    "fieldName": "message"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Detectors that met a load"
+              },
+              "version": 1,
+              "widgetType": "table"
+            }
+          }
+        },
+        {
+          "position": {
+            "height": 6,
+            "width": 6,
+            "x": 0,
+            "y": 26
+          },
+          "widget": {
+            "name": "datasets",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "sources_ingestion__by_dataset",
+                  "disaggregated": true,
+                  "fields": [
+                    {
+                      "expression": "`dataset`",
+                      "name": "dataset"
+                    },
+                    {
+                      "expression": "`runs`",
+                      "name": "runs"
+                    },
+                    {
+                      "expression": "`rows`",
+                      "name": "rows"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "encodings": {
+                "columns": [
+                  {
+                    "displayName": "dataset",
+                    "fieldName": "dataset"
+                  },
+                  {
+                    "displayName": "runs",
+                    "fieldName": "runs"
+                  },
+                  {
+                    "displayName": "rows",
+                    "fieldName": "rows"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Runs and rows per dataset"
+              },
+              "version": 1,
+              "widgetType": "table"
+            }
+          }
+        }
+      ],
+      "name": "sources_ingestion"
+    }
+  ]
+}

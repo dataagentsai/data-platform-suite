@@ -1,0 +1,253 @@
+{
+  "datasets": [
+    {
+      "displayName": "breaches",
+      "name": "freshness_slos__breaches",
+      "queryLines": [
+        "SELECT `day`, `dataset`, `key`, `age_hours`, `error_hours`, `tier`\n",
+        "FROM `dev_ops`.`ops`.`ops_freshness`\n",
+        "WHERE `breach` = TRUE\n",
+        "ORDER BY `day`"
+      ]
+    },
+    {
+      "displayName": "breaches daily",
+      "name": "freshness_slos__breaches_daily",
+      "queryLines": [
+        "SELECT `day`, MEASURE(`breaches`) AS `breaches`\n",
+        "FROM `dev_ops`.`ops`.`mv_ops_freshness`\n",
+        "WHERE `breach` = TRUE\n",
+        "GROUP BY `day`\n",
+        "ORDER BY `day`"
+      ]
+    },
+    {
+      "displayName": "slo",
+      "name": "freshness_slos__slo",
+      "queryLines": [
+        "SELECT `dataset`, MEASURE(`met_pct`) AS `met_pct`\n",
+        "FROM `dev_ops`.`ops`.`mv_ops_slo`\n",
+        "GROUP BY `dataset`\n",
+        "ORDER BY `dataset`"
+      ]
+    }
+  ],
+  "pages": [
+    {
+      "displayName": "Freshness and SLOs",
+      "layout": [
+        {
+          "position": {
+            "height": 2,
+            "width": 6,
+            "x": 0,
+            "y": 0
+          },
+          "widget": {
+            "multilineTextboxSpec": {
+              "lines": [
+                "## Freshness and SLOs\n",
+                "\n",
+                "Is the data as fresh as each dataset's contract promises? Breaches of the manifest's own targets, per dataset and per feed, and how often each target was met. Learned freshness and completeness alerts per table are the platform's anomaly detection (adopted, not rebuilt); this screen keeps only the promised targets it cannot know.\n",
+                "\n",
+                "Owned by observability. Built from the ops metric views over the compact ops tables (run log, daily telemetry copy, freshness, alerts), joined by run id. Discharges DPC-0057, FRESH-01, OPS-01, LATE-01."
+              ]
+            },
+            "name": "about"
+          }
+        },
+        {
+          "position": {
+            "height": 6,
+            "width": 3,
+            "x": 0,
+            "y": 2
+          },
+          "widget": {
+            "name": "slo_met",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "freshness_slos__slo",
+                  "disaggregated": true,
+                  "fields": [
+                    {
+                      "expression": "`dataset`",
+                      "name": "dataset"
+                    },
+                    {
+                      "expression": "`met_pct`",
+                      "name": "met_pct"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "encodings": {
+                "x": {
+                  "displayName": "dataset",
+                  "fieldName": "dataset",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "displayName": "met pct",
+                  "fieldName": "met_pct",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Share of checks within target (%)"
+              },
+              "version": 3,
+              "widgetType": "bar"
+            }
+          }
+        },
+        {
+          "position": {
+            "height": 6,
+            "width": 3,
+            "x": 3,
+            "y": 2
+          },
+          "widget": {
+            "name": "breaches_per_day",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "freshness_slos__breaches_daily",
+                  "disaggregated": true,
+                  "fields": [
+                    {
+                      "expression": "`day`",
+                      "name": "day"
+                    },
+                    {
+                      "expression": "`breaches`",
+                      "name": "breaches"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "encodings": {
+                "x": {
+                  "displayName": "day",
+                  "fieldName": "day",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "displayName": "breaches",
+                  "fieldName": "breaches",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Freshness breaches per day"
+              },
+              "version": 3,
+              "widgetType": "bar"
+            }
+          }
+        },
+        {
+          "position": {
+            "height": 6,
+            "width": 6,
+            "x": 0,
+            "y": 8
+          },
+          "widget": {
+            "name": "breach_list",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "freshness_slos__breaches",
+                  "disaggregated": true,
+                  "fields": [
+                    {
+                      "expression": "`day`",
+                      "name": "day"
+                    },
+                    {
+                      "expression": "`dataset`",
+                      "name": "dataset"
+                    },
+                    {
+                      "expression": "`key`",
+                      "name": "key"
+                    },
+                    {
+                      "expression": "`age_hours`",
+                      "name": "age_hours"
+                    },
+                    {
+                      "expression": "`error_hours`",
+                      "name": "error_hours"
+                    },
+                    {
+                      "expression": "`tier`",
+                      "name": "tier"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "encodings": {
+                "columns": [
+                  {
+                    "displayName": "day",
+                    "fieldName": "day"
+                  },
+                  {
+                    "displayName": "dataset",
+                    "fieldName": "dataset"
+                  },
+                  {
+                    "displayName": "key",
+                    "fieldName": "key"
+                  },
+                  {
+                    "displayName": "age hours",
+                    "fieldName": "age_hours"
+                  },
+                  {
+                    "displayName": "error hours",
+                    "fieldName": "error_hours"
+                  },
+                  {
+                    "displayName": "tier",
+                    "fieldName": "tier"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Breaches (dataset or feed past its error target)"
+              },
+              "version": 1,
+              "widgetType": "table"
+            }
+          }
+        }
+      ],
+      "name": "freshness_slos"
+    }
+  ]
+}

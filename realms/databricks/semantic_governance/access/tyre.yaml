@@ -1,0 +1,34 @@
+# Access model for the tyre domain (DPC-0066): groups -> layers and domains; what they see of protected columns.
+# Product-free: the kernel (dataplatform.access.model) plans it, the realm renders Unity Catalog SQL.
+# Proposed home: the catalog slice (slices/02-tyre/manifest/access.yaml) once the governance owner agrees the shape (docs/W5-DECISIONS.md).
+#
+#   layers     which catalogs <env>_<layer> the group reads
+#   domains    all, or the domains whose tables it reads (contract domain)
+#   protected  see: confidential and restricted columns show their stored value (a token for restricted data,
+#              never detokenised); masked: they show *** (or NULL for non-text columns)
+groups:
+  - name: data-platform-jobs          # service principals that run jobs and pipelines (ENV-02); must read what they load
+    layers: [landing, bronze, silver, gold]
+    domains: all
+    protected: see
+  - name: platform-engineers          # people who build and debug the platform: everything, protected columns masked
+    layers: [bronze, silver, gold]
+    domains: all
+    protected: masked
+  - name: sales-data                  # contract team: owns the sales domain
+    layers: [silver, gold]
+    domains: [sales]
+    protected: see
+  - name: manufacturing-data
+    layers: [silver, gold]
+    domains: [manufacturing]
+    protected: see
+  - name: quality-data
+    layers: [silver, gold]
+    domains: [quality]
+    protected: see
+  - name: analysts                    # ADR-012: analysts see gold only
+    layers: [gold]
+    domains: all
+    protected: masked
+row_filters: []                       # none declared by the specs yet; the mechanism is tested (tests/dataplatform/test_access_model.py)

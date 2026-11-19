@@ -1,0 +1,47 @@
+# DataTwin scenario (G10), day 3: For two hours, 4% of readings from 6 presses arrive up to 90 seconds late and out
+# of order.
+# Oracle (world.yaml): every reading lands in the hour of its event time; hourly scrap and press-hour totals equal
+# the world's truth
+# FIXTURE note: the obs checks run on obs/fixture.py; ingestion and silver checks run on the engine when a
+# run of it is attached (tests/dataplatform/test_twin_engine.py); gold checks too since W1d; DES checks are pending (W1e).
+apiVersion: dwd-scenario/v0
+scenario: readings-out-of-order
+incident: readings-out-of-order
+story: out_of_order
+world: slices/02-tyre/world.yaml
+discharges:
+- LATE-03
+- DPC-0060
+- OPS-01
+- OPS-06
+checks:
+- id: planted
+  layer: world
+  kind: planted
+- id: shown
+  layer: obs
+  kind: on_dashboard
+  dashboard: platform_health
+  widget: steps_not_passed
+  match:
+    dataset: press_stream.press_reading
+    step: detect.LATE-03
+- id: one-alert
+  layer: obs
+  kind: one_alert
+  rule: detector-fired
+  subject: press_stream.press_reading/LATE-03
+  fired_day: 3
+  resolved_day: 4
+- id: silver
+  layer: silver
+  kind: engine
+  says: every reading lands in the hour of its event time
+  expect: verdict
+  verdict: handled
+- id: gold
+  layer: gold
+  kind: engine
+  says: hourly scrap and press-hour totals equal the world's truth
+  expect: totals
+  day: 3

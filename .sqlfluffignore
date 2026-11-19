@@ -1,0 +1,3 @@
+# PostgreSQL (PL/pgSQL) files: the repo-wide sqlfluff run uses the T-SQL dialect for the old Azure SQL metadata
+# schema, which cannot parse them. The PostgreSQL schema is proved by tests/dataplatform/test_meta_store.py instead.
+src/dataplatform/adapters/sql/

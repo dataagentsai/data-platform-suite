@@ -1,0 +1,623 @@
+{
+  "datasets": [
+    {
+      "displayName": "status daily",
+      "name": "platform_health__status_daily",
+      "queryLines": [
+        "SELECT `day`, `status`, MEASURE(`dataset_runs`) AS `dataset_runs`\n",
+        "FROM `dev_ops`.`ops`.`mv_ops_run_status`\n",
+        "GROUP BY `day`, `status`\n",
+        "ORDER BY `day`, `status`"
+      ]
+    },
+    {
+      "displayName": "errors daily",
+      "name": "platform_health__errors_daily",
+      "queryLines": [
+        "SELECT `day`, `error_class`, MEASURE(`errors`) AS `errors`\n",
+        "FROM `dev_ops`.`ops`.`mv_ops_errors`\n",
+        "GROUP BY `day`, `error_class`\n",
+        "ORDER BY `day`, `error_class`"
+      ]
+    },
+    {
+      "displayName": "not succeeded",
+      "name": "platform_health__not_succeeded",
+      "queryLines": [
+        "SELECT `day`, `dataset`, `status`, `message`, `origin`, `run_id`\n",
+        "FROM `dev_ops`.`ops`.`ops_dataset_runs`\n",
+        "WHERE `status` IN ('failed', 'skipped')\n",
+        "ORDER BY `day` DESC"
+      ]
+    },
+    {
+      "displayName": "alerts",
+      "name": "platform_health__alerts",
+      "queryLines": [
+        "SELECT `day`, `rule`, `subject`, `kind`, `channel`, `to`, `run_id`\n",
+        "FROM `dev_ops`.`ops`.`ops_alerts`\n",
+        "ORDER BY `at` DESC"
+      ]
+    },
+    {
+      "displayName": "alert counts",
+      "name": "platform_health__alert_counts",
+      "queryLines": [
+        "SELECT `day`, `rule`, MEASURE(`alerts`) AS `alerts`\n",
+        "FROM `dev_ops`.`ops`.`mv_ops_alerts`\n",
+        "GROUP BY `day`, `rule`\n",
+        "ORDER BY `day`, `rule`"
+      ]
+    },
+    {
+      "displayName": "severity daily",
+      "name": "platform_health__severity_daily",
+      "queryLines": [
+        "SELECT `day`, `owner`, `severity`, MEASURE(`steps`) AS `steps`\n",
+        "FROM `dev_ops`.`ops`.`mv_ops_steps`\n",
+        "GROUP BY `day`, `owner`, `severity`\n",
+        "ORDER BY `day`, `owner`, `severity`"
+      ]
+    },
+    {
+      "displayName": "steps not passed",
+      "name": "platform_health__steps_not_passed",
+      "queryLines": [
+        "SELECT `day`, `dataset`, `owner`, `step`, `severity`, `message`, `screen`, `run_id`\n",
+        "FROM `dev_ops`.`ops`.`ops_steps`\n",
+        "WHERE `passed` = FALSE\n",
+        "ORDER BY `day`"
+      ]
+    }
+  ],
+  "pages": [
+    {
+      "displayName": "Platform health",
+      "layout": [
+        {
+          "position": {
+            "height": 2,
+            "width": 6,
+            "x": 0,
+            "y": 0
+          },
+          "widget": {
+            "multilineTextboxSpec": {
+              "lines": [
+                "## Platform health\n",
+                "\n",
+                "Did the loads run, and did they succeed? Runs per day by outcome, errors by class, what failed, the alerts that went out, and each owner's step results by severity (the detail is on the owner's screen). Job-level runs, their count and run time are the platform's own job monitoring screen (adopted, not rebuilt): this screen starts below the job, at the dataset.\n",
+                "\n",
+                "Owned by observability. Built from the ops metric views over the compact ops tables (run log, daily telemetry copy, freshness, alerts), joined by run id. Discharges DPC-0057, OPS-03, OPS-01, OPS-06."
+              ]
+            },
+            "name": "about"
+          }
+        },
+        {
+          "position": {
+            "height": 6,
+            "width": 3,
+            "x": 0,
+            "y": 2
+          },
+          "widget": {
+            "name": "status",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "platform_health__status_daily",
+                  "disaggregated": true,
+                  "fields": [
+                    {
+                      "expression": "`day`",
+                      "name": "day"
+                    },
+                    {
+                      "expression": "`dataset_runs`",
+                      "name": "dataset_runs"
+                    },
+                    {
+                      "expression": "`status`",
+                      "name": "status"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "encodings": {
+                "color": {
+                  "displayName": "status",
+                  "fieldName": "status",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "x": {
+                  "displayName": "day",
+                  "fieldName": "day",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "displayName": "dataset runs",
+                  "fieldName": "dataset_runs",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Dataset runs per day by outcome"
+              },
+              "version": 3,
+              "widgetType": "bar"
+            }
+          }
+        },
+        {
+          "position": {
+            "height": 6,
+            "width": 3,
+            "x": 3,
+            "y": 2
+          },
+          "widget": {
+            "name": "errors",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "platform_health__errors_daily",
+                  "disaggregated": true,
+                  "fields": [
+                    {
+                      "expression": "`day`",
+                      "name": "day"
+                    },
+                    {
+                      "expression": "`errors`",
+                      "name": "errors"
+                    },
+                    {
+                      "expression": "`error_class`",
+                      "name": "error_class"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "encodings": {
+                "color": {
+                  "displayName": "error_class",
+                  "fieldName": "error_class",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "x": {
+                  "displayName": "day",
+                  "fieldName": "day",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "displayName": "errors",
+                  "fieldName": "errors",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Errors per day by class"
+              },
+              "version": 3,
+              "widgetType": "bar"
+            }
+          }
+        },
+        {
+          "position": {
+            "height": 6,
+            "width": 3,
+            "x": 0,
+            "y": 8
+          },
+          "widget": {
+            "name": "alerts_per_day",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "platform_health__alert_counts",
+                  "disaggregated": true,
+                  "fields": [
+                    {
+                      "expression": "`day`",
+                      "name": "day"
+                    },
+                    {
+                      "expression": "`alerts`",
+                      "name": "alerts"
+                    },
+                    {
+                      "expression": "`rule`",
+                      "name": "rule"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "encodings": {
+                "color": {
+                  "displayName": "rule",
+                  "fieldName": "rule",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "x": {
+                  "displayName": "day",
+                  "fieldName": "day",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "displayName": "alerts",
+                  "fieldName": "alerts",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Alerts sent per rule per day"
+              },
+              "version": 3,
+              "widgetType": "bar"
+            }
+          }
+        },
+        {
+          "position": {
+            "height": 6,
+            "width": 3,
+            "x": 3,
+            "y": 8
+          },
+          "widget": {
+            "name": "severity",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "platform_health__severity_daily",
+                  "disaggregated": true,
+                  "fields": [
+                    {
+                      "expression": "`day`",
+                      "name": "day"
+                    },
+                    {
+                      "expression": "`steps`",
+                      "name": "steps"
+                    },
+                    {
+                      "expression": "`severity`",
+                      "name": "severity"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "encodings": {
+                "color": {
+                  "displayName": "severity",
+                  "fieldName": "severity",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "x": {
+                  "displayName": "day",
+                  "fieldName": "day",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "displayName": "steps",
+                  "fieldName": "steps",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Step results per day by severity (owners judge, observability reports)"
+              },
+              "version": 3,
+              "widgetType": "bar"
+            }
+          }
+        },
+        {
+          "position": {
+            "height": 6,
+            "width": 6,
+            "x": 0,
+            "y": 14
+          },
+          "widget": {
+            "name": "failed",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "platform_health__not_succeeded",
+                  "disaggregated": true,
+                  "fields": [
+                    {
+                      "expression": "`day`",
+                      "name": "day"
+                    },
+                    {
+                      "expression": "`dataset`",
+                      "name": "dataset"
+                    },
+                    {
+                      "expression": "`status`",
+                      "name": "status"
+                    },
+                    {
+                      "expression": "`message`",
+                      "name": "message"
+                    },
+                    {
+                      "expression": "`origin`",
+                      "name": "origin"
+                    },
+                    {
+                      "expression": "`run_id`",
+                      "name": "run_id"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "encodings": {
+                "columns": [
+                  {
+                    "displayName": "day",
+                    "fieldName": "day"
+                  },
+                  {
+                    "displayName": "dataset",
+                    "fieldName": "dataset"
+                  },
+                  {
+                    "displayName": "status",
+                    "fieldName": "status"
+                  },
+                  {
+                    "displayName": "message",
+                    "fieldName": "message"
+                  },
+                  {
+                    "displayName": "origin",
+                    "fieldName": "origin"
+                  },
+                  {
+                    "displayName": "run id",
+                    "fieldName": "run_id"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Dataset runs that failed or were blocked"
+              },
+              "version": 1,
+              "widgetType": "table"
+            }
+          }
+        },
+        {
+          "position": {
+            "height": 6,
+            "width": 6,
+            "x": 0,
+            "y": 20
+          },
+          "widget": {
+            "name": "steps_not_passed",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "platform_health__steps_not_passed",
+                  "disaggregated": true,
+                  "fields": [
+                    {
+                      "expression": "`day`",
+                      "name": "day"
+                    },
+                    {
+                      "expression": "`dataset`",
+                      "name": "dataset"
+                    },
+                    {
+                      "expression": "`owner`",
+                      "name": "owner"
+                    },
+                    {
+                      "expression": "`step`",
+                      "name": "step"
+                    },
+                    {
+                      "expression": "`severity`",
+                      "name": "severity"
+                    },
+                    {
+                      "expression": "`message`",
+                      "name": "message"
+                    },
+                    {
+                      "expression": "`screen`",
+                      "name": "screen"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "encodings": {
+                "columns": [
+                  {
+                    "displayName": "day",
+                    "fieldName": "day"
+                  },
+                  {
+                    "displayName": "dataset",
+                    "fieldName": "dataset"
+                  },
+                  {
+                    "displayName": "owner",
+                    "fieldName": "owner"
+                  },
+                  {
+                    "displayName": "step",
+                    "fieldName": "step"
+                  },
+                  {
+                    "displayName": "severity",
+                    "fieldName": "severity"
+                  },
+                  {
+                    "displayName": "message",
+                    "fieldName": "message"
+                  },
+                  {
+                    "displayName": "screen",
+                    "fieldName": "screen"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Steps not passed, with the owner's screen"
+              },
+              "version": 1,
+              "widgetType": "table"
+            }
+          }
+        },
+        {
+          "position": {
+            "height": 6,
+            "width": 6,
+            "x": 0,
+            "y": 26
+          },
+          "widget": {
+            "name": "alert_log",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "platform_health__alerts",
+                  "disaggregated": true,
+                  "fields": [
+                    {
+                      "expression": "`day`",
+                      "name": "day"
+                    },
+                    {
+                      "expression": "`rule`",
+                      "name": "rule"
+                    },
+                    {
+                      "expression": "`subject`",
+                      "name": "subject"
+                    },
+                    {
+                      "expression": "`kind`",
+                      "name": "kind"
+                    },
+                    {
+                      "expression": "`channel`",
+                      "name": "channel"
+                    },
+                    {
+                      "expression": "`to`",
+                      "name": "to"
+                    },
+                    {
+                      "expression": "`run_id`",
+                      "name": "run_id"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "encodings": {
+                "columns": [
+                  {
+                    "displayName": "day",
+                    "fieldName": "day"
+                  },
+                  {
+                    "displayName": "rule",
+                    "fieldName": "rule"
+                  },
+                  {
+                    "displayName": "subject",
+                    "fieldName": "subject"
+                  },
+                  {
+                    "displayName": "kind",
+                    "fieldName": "kind"
+                  },
+                  {
+                    "displayName": "channel",
+                    "fieldName": "channel"
+                  },
+                  {
+                    "displayName": "to",
+                    "fieldName": "to"
+                  },
+                  {
+                    "displayName": "run id",
+                    "fieldName": "run_id"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Alert log"
+              },
+              "version": 1,
+              "widgetType": "table"
+            }
+          }
+        }
+      ],
+      "name": "platform_health"
+    }
+  ]
+}

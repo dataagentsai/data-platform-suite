@@ -1,0 +1,2143 @@
+[
+ {
+  "allowed": null,
+  "default": "false",
+  "description": "SQL Server only \u2014 WITH (NOLOCK) opt-in for FULL loads.",
+  "key": "allow_dirty_reads",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "bool"
+ },
+ {
+  "allowed": null,
+  "default": "1000",
+  "description": "Per-record cap on explode.",
+  "key": "array_max_explode_rows",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "int"
+ },
+ {
+  "allowed": [
+   "preserve",
+   "stringify",
+   "explode",
+   "take_first_only"
+  ],
+  "default": null,
+  "description": "How arrays are handled when flattening.",
+  "key": "array_strategy",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "enum"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Azure Blob container name for this dataset. One Azure Blob source can read from multiple containers in the same storage account, so container is per-dataset rather than per-source. Reuses the view's `bucket` column alongside s3_bucket.",
+  "key": "azure_blob_container",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Source BigQuery dataset (BQ schema).",
+  "key": "bigquery_dataset",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "identifier"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Partition column for predicate pushdown.",
+  "key": "bigquery_partition_column",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "identifier"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Source BigQuery project ID.",
+  "key": "bigquery_project",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Whether a baseline batch is written before old bronze ages out (ADR-029); default true; small reference tables may keep bronze forever instead.",
+  "key": "bronze_baseline",
+  "scope": "dataset",
+  "status": "proposed",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Days bronze keeps a batch before a baseline batch replaces the oldest history (ADR-029); default 1095.",
+  "key": "bronze_retention_days",
+  "scope": "dataset",
+  "status": "proposed",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": "v2",
+  "description": "Salesforce Bulk API version.",
+  "key": "bulk_api_version",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Column that holds the source commit time of a change; default committed_at (ADR-034 stamps it).",
+  "key": "cdc_commit_column",
+  "scope": "dataset",
+  "status": "proposed",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Column in a change-capture delivery that holds the operation (I, U, D); default op. A change-capture service may name it differently (ADR-031, B3).",
+  "key": "cdc_op_column",
+  "scope": "dataset",
+  "status": "proposed",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Column that holds an integer feed position used for the feed bookmark; default feed_pos. Empty when the service gives none (its change sequence then orders history through load.history_order_by).",
+  "key": "cdc_position_column",
+  "scope": "dataset",
+  "status": "proposed",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Failed calls in a row after which a source is left alone for circuit_reset_seconds (B7, X18); default 3.",
+  "key": "circuit_failure_threshold",
+  "scope": "dataset",
+  "status": "proposed",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "How long an open circuit keeps a source from being called before one trial call (B7, X18); default 1800.",
+  "key": "circuit_reset_seconds",
+  "scope": "dataset",
+  "status": "proposed",
+  "value_type": "string"
+ },
+ {
+  "allowed": [
+   "snappy",
+   "gzip",
+   "zstd",
+   "none"
+  ],
+  "default": null,
+  "description": "Compression codec.",
+  "key": "compression",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "enum"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Passed through to Azure resource tags.",
+  "key": "cost_center",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": ",",
+  "description": "CSV column delimiter (1 char).",
+  "key": "csv_delimiter",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": "\"",
+  "description": "CSV escape character (1 char).",
+  "key": "csv_escape_char",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": "true",
+  "description": "CSV header row drives column names.",
+  "key": "csv_has_header",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "bool"
+ },
+ {
+  "allowed": null,
+  "default": "true",
+  "description": "When false, all CSV columns are STRING.",
+  "key": "csv_infer_types",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "bool"
+ },
+ {
+  "allowed": null,
+  "default": "\"",
+  "description": "CSV quote character (1 char).",
+  "key": "csv_quote_char",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": "0",
+  "description": "Skip banner / footer rows.",
+  "key": "csv_skip_rows",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "int"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Single-statement SQL; required for QUERY datasets.",
+  "key": "custom_query",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "string"
+ },
+ {
+  "allowed": [
+   "TABLE",
+   "VIEW",
+   "QUERY",
+   "DOCUMENT"
+  ],
+  "default": null,
+  "description": "Source shape.",
+  "key": "dataset_type",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "enum"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Entity set name (plural form, e.g. accounts).",
+  "key": "dataverse_entity_set",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "OData $expand for related entities.",
+  "key": "dataverse_expand",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Additional $filter expression.",
+  "key": "dataverse_filter",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "OData $select field list.",
+  "key": "dataverse_select",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Comma-separated business-key columns for dedup (when mode is business_key_first / business_key_latest / flag).",
+  "key": "dedup.business_keys",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "string"
+ },
+ {
+  "allowed": [
+   "none",
+   "exact",
+   "business_key_first",
+   "business_key_latest",
+   "flag"
+  ],
+  "default": null,
+  "description": "Row-level dedup mode applied before _record_hash recompute.",
+  "key": "dedup.mode",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "enum"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Column used to resolve 'latest' for dedup.mode=business_key_latest.",
+  "key": "dedup.order_by",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": "false",
+  "description": "Run text extraction at ingest.",
+  "key": "document_extract_text",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "bool"
+ },
+ {
+  "allowed": null,
+  "default": "1073741824",
+  "description": "Files larger are skipped + warned.",
+  "key": "document_max_size_bytes",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "int"
+ },
+ {
+  "allowed": null,
+  "default": "*",
+  "description": "Comma-separated allow-list (application/pdf,text/html).",
+  "key": "document_mime_filter",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": "268435456",
+  "description": "Files larger have content_bytes=NULL and offload.",
+  "key": "document_offload_threshold_bytes",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "int"
+ },
+ {
+  "allowed": [
+   "pdfminer",
+   "tika",
+   "pandoc",
+   "plain"
+  ],
+  "default": null,
+  "description": "Required when document_extract_text=true.",
+  "key": "document_text_extractor",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "enum"
+ },
+ {
+  "allowed": null,
+  "default": "false",
+  "description": "Enables ADF staged copy.",
+  "key": "enable_staging",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "bool"
+ },
+ {
+  "allowed": null,
+  "default": "false",
+  "description": "Rare; if true, dataset_master.is_enabled=0 is ignored.",
+  "key": "enabled_overrides_master",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "bool"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "From --discover or hand-set; drives auto-classification.",
+  "key": "estimated_row_count",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "int"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Optional refinement of classifier.",
+  "key": "estimated_size_bytes",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "int"
+ },
+ {
+  "allowed": null,
+  "default": "1",
+  "description": "1-indexed row number of header.",
+  "key": "excel_header_row",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "int"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "For Excel format; default is first sheet.",
+  "key": "excel_sheet_name",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": "false",
+  "description": "Filter IsDeleted=false (Salesforce).",
+  "key": "exclude_deleted",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "bool"
+ },
+ {
+  "allowed": [
+   "staged",
+   "jdbc"
+  ],
+  "default": null,
+  "description": "staged via COPY INTO/EXPORT DATA, or direct JDBC SELECT.",
+  "key": "extraction_mode",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "enum"
+ },
+ {
+  "allowed": [
+   "utf-8",
+   "utf-8-bom",
+   "cp1252",
+   "latin-1",
+   "utf-16"
+  ],
+  "default": "utf-8",
+  "description": "Source file encoding.",
+  "key": "file_encoding",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "enum"
+ },
+ {
+  "allowed": [
+   "PARQUET",
+   "DELTA",
+   "JSON"
+  ],
+  "default": null,
+  "description": "File format; falls back to platform default.",
+  "key": "file_format",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "enum"
+ },
+ {
+  "allowed": [
+   "csv",
+   "tsv",
+   "pipe",
+   "fixed_width",
+   "json_lines",
+   "json_object",
+   "xml",
+   "excel",
+   "parquet",
+   "avro"
+  ],
+  "default": null,
+  "description": "Source file format (distinct from sink file_format).",
+  "key": "file_format_data",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "enum"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Single source file name (SFTP file under sftp_folder_path, S3 object under s3_bucket, or Azure Blob blob under azure_blob_container). Wildcard / glob support is deferred.",
+  "key": "file_name",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Glob pattern for which files to ingest.",
+  "key": "file_pattern",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "string"
+ },
+ {
+  "allowed": [
+   "auto",
+   "adf",
+   "function",
+   "databricks"
+  ],
+  "default": "auto",
+  "description": "Where flattening runs.",
+  "key": "flattening_engine",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "enum"
+ },
+ {
+  "allowed": [
+   "preserve",
+   "stringify",
+   "flatten_explicit"
+  ],
+  "default": null,
+  "description": "Per-source-type default; overridable per dataset.",
+  "key": "flattening_mode",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "enum"
+ },
+ {
+  "allowed": [
+   "_",
+   ".",
+   ":"
+  ],
+  "default": "_",
+  "description": "Path joiner for flattened column names.",
+  "key": "flattening_path_separator",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "enum"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "For history kind source_versioned (ADR-032): whether the source may leave gaps between versions; default false.",
+  "key": "gaps_allowed",
+  "scope": "dataset",
+  "status": "proposed",
+  "value_type": "string"
+ },
+ {
+  "allowed": [
+   "auto",
+   "4",
+   "8",
+   "16",
+   "32"
+  ],
+  "default": "auto",
+  "description": "ADF Copy DataIntegrationUnits.",
+  "key": "intended_dius",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "enum"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Days a delivery stays in the landing archive (ADR-029); default as long as bronze, 90 when the dataset holds personal data.",
+  "key": "landing_archive_days",
+  "scope": "dataset",
+  "status": "proposed",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Days a delivery stays in landing before it moves to the landing archive (ADR-029); default 30.",
+  "key": "landing_hot_days",
+  "scope": "dataset",
+  "status": "proposed",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Which golden path moves this dataset (ADR-030), e.g. p1_files | p2_stream | p4_other_compute; the binding sets the default, chosen per dataset after the benchmark.",
+  "key": "lane_path",
+  "scope": "dataset",
+  "status": "proposed",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Per-dataset override.",
+  "key": "lifecycle_archive_days",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "int"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Per-dataset override of platform_config.lifecycle_cool_days.",
+  "key": "lifecycle_cool_days",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "int"
+ },
+ {
+  "allowed": null,
+  "default": "0",
+  "description": "When > 0, ADLS lifecycle deletes blobs of this age.",
+  "key": "lifecycle_delete_days",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "int"
+ },
+ {
+  "allowed": [
+   "single_query",
+   "segmented_pit",
+   "segmented_eventual"
+  ],
+  "default": "segmented_eventual",
+  "description": "Snapshot guarantee.",
+  "key": "load_consistency_mode",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "enum"
+ },
+ {
+  "allowed": [
+   "small",
+   "large",
+   "huge",
+   "auto"
+  ],
+  "default": "auto",
+  "description": "Classifier mode.",
+  "key": "load_profile",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "enum"
+ },
+ {
+  "allowed": [
+   "FULL",
+   "INCREMENTAL"
+  ],
+  "default": null,
+  "description": "Load mode.",
+  "key": "load_type",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "enum"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Which mover delivers this dataset into landing (ADR-033, GP2): the binding names the product per value, e.g. change_capture | file_transfer | pull_job | pull_function | drop (the source writes landing itself).",
+  "key": "mover",
+  "scope": "dataset",
+  "status": "proposed",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "How many parallel reads a pull mover may open against the source (JDBC partitions, concurrent pages); bounded by the source's max_concurrent_datasets.",
+  "key": "mover_parallelism",
+  "scope": "dataset",
+  "status": "proposed",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "The secret://<name> reference the mover uses to reach the source (DPC-0029); never a value. The legacy connection_secret_name (kv://) stays for the old realm.",
+  "key": "mover_secret_ref",
+  "scope": "dataset",
+  "status": "proposed",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Free-text; surfaced in deploy summary.",
+  "key": "notes",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Source object name; required for TABLE/VIEW.",
+  "key": "object_name",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "identifier"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Request param name for the cursor.",
+  "key": "pagination_cursor_param",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "JSONPath into response for cursor-style pagination.",
+  "key": "pagination_cursor_path",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Request param name for offset-style.",
+  "key": "pagination_page_param",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": "100",
+  "description": "Default page size.",
+  "key": "pagination_size_default",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "int"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Request param name for page size.",
+  "key": "pagination_size_param",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "string"
+ },
+ {
+  "allowed": [
+   "cursor",
+   "offset",
+   "link_header",
+   "none"
+  ],
+  "default": null,
+  "description": "Pagination mechanism.",
+  "key": "pagination_style",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "enum"
+ },
+ {
+  "allowed": null,
+  "default": "4",
+  "description": "Copy Activity parallelCopies.",
+  "key": "parallel_copies",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "int"
+ },
+ {
+  "allowed": null,
+  "default": "128",
+  "description": "Parquet row-group size in MB.",
+  "key": "parquet_row_group_mb",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "int"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Enables ADF DynamicRange partitioned source read.",
+  "key": "partition_column",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "identifier"
+ },
+ {
+  "allowed": null,
+  "default": "4",
+  "description": "Number of source-side partitions.",
+  "key": "partition_count",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "int"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Inclusive lower bound for partitioned read.",
+  "key": "partition_lower",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Inclusive upper bound for partitioned read.",
+  "key": "partition_upper",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": "true",
+  "description": "Write _raw column for flatten_explicit datasets.",
+  "key": "preserve_raw_record",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "bool"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Required when array_strategy=explode.",
+  "key": "primary_array_path",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "string"
+ },
+ {
+  "allowed": [
+   "enabled",
+   "disabled",
+   "opt_in",
+   "dataset_decides"
+  ],
+  "default": null,
+  "description": "Per-dataset override for the 'case_normalize' processor group.",
+  "key": "processor_groups.case_normalize",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "enum"
+ },
+ {
+  "allowed": [
+   "enabled",
+   "disabled",
+   "opt_in",
+   "dataset_decides"
+  ],
+  "default": null,
+  "description": "Per-dataset override for the 'dedup' processor group.",
+  "key": "processor_groups.dedup",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "enum"
+ },
+ {
+  "allowed": [
+   "enabled",
+   "disabled",
+   "opt_in",
+   "dataset_decides"
+  ],
+  "default": null,
+  "description": "Per-dataset override for the 'hygiene' processor group.",
+  "key": "processor_groups.hygiene",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "enum"
+ },
+ {
+  "allowed": [
+   "enabled",
+   "disabled",
+   "opt_in",
+   "dataset_decides"
+  ],
+  "default": null,
+  "description": "Per-dataset override for the 'pii' processor group.",
+  "key": "processor_groups.pii",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "enum"
+ },
+ {
+  "allowed": [
+   "enabled",
+   "disabled",
+   "opt_in",
+   "dataset_decides"
+  ],
+  "default": null,
+  "description": "Per-dataset override for the 'provenance' processor group.",
+  "key": "processor_groups.provenance",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "enum"
+ },
+ {
+  "allowed": [
+   "enabled",
+   "disabled",
+   "opt_in",
+   "dataset_decides"
+  ],
+  "default": null,
+  "description": "Per-dataset override for the 'standardization' processor group.",
+  "key": "processor_groups.standardization",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "enum"
+ },
+ {
+  "allowed": [
+   "enabled",
+   "disabled",
+   "opt_in",
+   "dataset_decides"
+  ],
+  "default": null,
+  "description": "Per-dataset override for the 'timestamp_normalize' processor group.",
+  "key": "processor_groups.timestamp_normalize",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "enum"
+ },
+ {
+  "allowed": [
+   "enabled",
+   "disabled",
+   "opt_in",
+   "dataset_decides"
+  ],
+  "default": null,
+  "description": "Per-dataset override for the 'type_safety' processor group.",
+  "key": "processor_groups.type_safety",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "enum"
+ },
+ {
+  "allowed": null,
+  "default": "7200",
+  "description": "Source queryTimeout \u2014 how long the source DB has to return rows.",
+  "key": "query_timeout_seconds",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "int"
+ },
+ {
+  "allowed": [
+   "adf-adls"
+  ],
+  "default": null,
+  "description": "Dispatch realm.",
+  "key": "realm",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "enum"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Runtime: backfill window start.",
+  "key": "reingest_data_window_from",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Runtime: backfill window end.",
+  "key": "reingest_data_window_to",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "string"
+ },
+ {
+  "allowed": [
+   "single-partition",
+   "per-day-partition"
+  ],
+  "default": null,
+  "description": "Runtime: set by backfill CLI.",
+  "key": "reingest_strategy",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "enum"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "REST endpoint path appended to source_config.base_url (e.g. /v3/objects/contacts).",
+  "key": "relative_url",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": "false",
+  "description": "Recompute segment bounds every run.",
+  "key": "resegment_on_run",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "bool"
+ },
+ {
+  "allowed": null,
+  "default": "$",
+  "description": "JSONPath to records array in response.",
+  "key": "response_data_path",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Path under source_config.base_url.",
+  "key": "rest_endpoint_path",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "string"
+ },
+ {
+  "allowed": [
+   "GET",
+   "POST"
+  ],
+  "default": "GET",
+  "description": "HTTP method.",
+  "key": "rest_method",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "enum"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Per-dataset override of source_config.default_record_path (dotted path to the records array in the JSON response).",
+  "key": "rest_record_path",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": "2",
+  "description": "Copy Activity policy.retry \u2014 transient-failure retries.",
+  "key": "retry_count",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "int"
+ },
+ {
+  "allowed": null,
+  "default": "60",
+  "description": "Copy Activity policy.retryIntervalInSeconds.",
+  "key": "retry_interval_seconds",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "int"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "S3 bucket name (without s3:// prefix) for this dataset. One S3 source can read from multiple buckets, so bucket is per-dataset rather than per-source.",
+  "key": "s3_bucket",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Comma-separated field list; overrides discovery.",
+  "key": "salesforce_fields",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "SObject API name (e.g. Account).",
+  "key": "salesforce_object",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Groups dataset into a driver pipeline. Falls back to platform default.",
+  "key": "schedule_cron",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "cron"
+ },
+ {
+  "allowed": null,
+  "default": "UTC",
+  "description": "IANA timezone for the cron expression.",
+  "key": "schedule_timezone",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "The registry schedules by cron only; slice 1 starts a load when the delivery manifest exists (DPC-0004). Values: cron | on_delivery.",
+  "key": "schedule_trigger",
+  "scope": "dataset",
+  "status": "proposed",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Source schema; required for TABLE/VIEW.",
+  "key": "schema_name",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "identifier"
+ },
+ {
+  "allowed": null,
+  "default": "8",
+  "description": "Target segment count.",
+  "key": "segment_count",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "int"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Alternative to segment_count.",
+  "key": "segment_size_rows",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "int"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Required for range_*/modulo strategies.",
+  "key": "segmentation_column",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "identifier"
+ },
+ {
+  "allowed": [
+   "none",
+   "range_numeric",
+   "range_temporal",
+   "modulo",
+   "dynamic_range",
+   "file_per_segment"
+  ],
+  "default": null,
+  "description": "Required for large/huge datasets.",
+  "key": "segmentation_strategy",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "enum"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Source folder path for file-substrate datasets \u2014 SFTP folder, S3 prefix, or Azure Blob virtual path within the container. Distinct from target_path_template (the ADLS sink folder). Key name is a misnomer beyond SFTP; future cleanup will rename to source_folder_path.",
+  "key": "sftp_folder_path",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Sub-path under the drive root.",
+  "key": "sharepoint_path_prefix",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "string"
+ },
+ {
+  "allowed": [
+   "job",
+   "declarative"
+  ],
+  "default": "job",
+  "description": "Which engine builds silver for this dataset (ADR-035): job = our stages on job compute (default); declarative = the same stages inside a declarative pipeline, history by its managed change capture. The loader refuses a combination the engine cannot honour.",
+  "key": "silver_engine",
+  "scope": "dataset",
+  "status": "proposed",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": "4",
+  "description": "Copy Activity sink-side connection pool size.",
+  "key": "sink_max_concurrent_connections",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "int"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "The registry has one freshness threshold (sla_freshness_hours, used as the warning); the contract needs a second, the error threshold (FRESH-01).",
+  "key": "sla_freshness_error_hours",
+  "scope": "dataset",
+  "status": "proposed",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Per-dataset SLA for the freshness alert.",
+  "key": "sla_freshness_hours",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "int"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "The open table format a dataset's tables are written in (ADR-027). Values: iceberg | delta | hudi; the binding sets the default, a dataset may override.",
+  "key": "table_format",
+  "scope": "dataset",
+  "status": "proposed",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "ADLS container name; falls back to platform default.",
+  "key": "target_container",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Runtime: set by reingest/backfill CLI; cleared after run.",
+  "key": "target_load_date_override",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Tokens: {source_env}, {source}, {schema}, {object}, {yyyy}, {mm}, {dd}, {hh}, {segment}.",
+  "key": "target_path_template",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "path-template"
+ },
+ {
+  "allowed": null,
+  "default": "14400",
+  "description": "Copy Activity policy.timeout \u2014 wall-clock cap.",
+  "key": "timeout_seconds",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "int"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "For history kind source_versioned (ADR-032): the source column that holds a version's start.",
+  "key": "valid_from_column",
+  "scope": "dataset",
+  "status": "proposed",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "For history kind source_versioned (ADR-032): the source column that holds a version's end.",
+  "key": "valid_to_column",
+  "scope": "dataset",
+  "status": "proposed",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Days of table version history kept for undo (time travel), ADR-029; default 7.",
+  "key": "version_history_days",
+  "scope": "dataset",
+  "status": "proposed",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Required when load_type=INCREMENTAL.",
+  "key": "watermark_column",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "identifier"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Derived watermark expression for SAP HANA-style sources.",
+  "key": "watermark_expression",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "string"
+ },
+ {
+  "allowed": [
+   "iso8601",
+   "unix_seconds",
+   "unix_millis",
+   "yyyymmdd"
+  ],
+  "default": "iso8601",
+  "description": "Watermark serialization format for the URL.",
+  "key": "watermark_format",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "enum"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Used when meta.watermark row is missing.",
+  "key": "watermark_initial_value",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Query param for server-side watermark filter.",
+  "key": "watermark_param",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "XPath to record-level node; required for XML.",
+  "key": "xml_record_xpath",
+  "scope": "dataset",
+  "status": "registered",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": "30",
+  "description": "Delay between failed master run and the next auto-retry attempt.",
+  "key": "auto_retry_delay_minutes",
+  "scope": "platform",
+  "status": "registered",
+  "value_type": "int"
+ },
+ {
+  "allowed": null,
+  "default": "2",
+  "description": "Cap on auto-retries before requiring manual intervention.",
+  "key": "auto_retry_max_attempts",
+  "scope": "platform",
+  "status": "registered",
+  "value_type": "int"
+ },
+ {
+  "allowed": null,
+  "default": "false",
+  "description": "Auto-trigger TR_RERUN_FAILED after a PARTIAL master run.",
+  "key": "auto_retry_on_partial",
+  "scope": "platform",
+  "status": "registered",
+  "value_type": "bool"
+ },
+ {
+  "allowed": null,
+  "default": "10",
+  "description": "Cross-dataset parallelism cap (ADF ForEach batchCount).",
+  "key": "default_batch_count",
+  "scope": "platform",
+  "status": "registered",
+  "value_type": "int"
+ },
+ {
+  "allowed": [
+   "snappy",
+   "gzip",
+   "zstd",
+   "none"
+  ],
+  "default": "snappy",
+  "description": "Parquet compression codec.",
+  "key": "default_compression",
+  "scope": "platform",
+  "status": "registered",
+  "value_type": "enum"
+ },
+ {
+  "allowed": [
+   "PARQUET",
+   "DELTA",
+   "JSON"
+  ],
+  "default": "PARQUET",
+  "description": "File format when dataset_config.file_format is not set.",
+  "key": "default_file_format",
+  "scope": "platform",
+  "status": "registered",
+  "value_type": "enum"
+ },
+ {
+  "allowed": [
+   "adf-adls"
+  ],
+  "default": null,
+  "description": "Realm used when dataset_config.realm is not set.",
+  "key": "default_realm",
+  "scope": "platform",
+  "status": "registered",
+  "value_type": "enum"
+ },
+ {
+  "allowed": null,
+  "default": "0 2 * * *",
+  "description": "Used when dataset_config.schedule_cron is absent.",
+  "key": "default_schedule_cron",
+  "scope": "platform",
+  "status": "registered",
+  "value_type": "cron"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Cluster running the flattening notebook.",
+  "key": "flatten_databricks_cluster_id",
+  "scope": "platform",
+  "status": "registered",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Workspace path to the framework's flatten notebook.",
+  "key": "flatten_databricks_notebook_path",
+  "scope": "platform",
+  "status": "registered",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Databricks workspace URL for the flattening notebook.",
+  "key": "flatten_databricks_workspace",
+  "scope": "platform",
+  "status": "registered",
+  "value_type": "uri"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "When Function uses Function-Key auth instead of MSI.",
+  "key": "flatten_function_secret_name",
+  "scope": "platform",
+  "status": "registered",
+  "value_type": "kv-ref"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Azure Function endpoint that runs custom flattening (when used).",
+  "key": "flatten_function_url",
+  "scope": "platform",
+  "status": "registered",
+  "value_type": "uri"
+ },
+ {
+  "allowed": null,
+  "default": "1000000000",
+  "description": "Row count at which classifier escalates to huge.",
+  "key": "huge_table_row_threshold",
+  "scope": "platform",
+  "status": "registered",
+  "value_type": "int"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Vault for all secret references (https://<vault>.vault.azure.net/).",
+  "key": "key_vault_uri",
+  "scope": "platform",
+  "status": "registered",
+  "value_type": "uri"
+ },
+ {
+  "allowed": null,
+  "default": "10000000",
+  "description": "Row count at which auto-classifier marks a dataset large.",
+  "key": "large_table_row_threshold",
+  "scope": "platform",
+  "status": "registered",
+  "value_type": "int"
+ },
+ {
+  "allowed": null,
+  "default": "180",
+  "description": "Cool to Archive tier age threshold.",
+  "key": "lifecycle_archive_days",
+  "scope": "platform",
+  "status": "registered",
+  "value_type": "int"
+ },
+ {
+  "allowed": null,
+  "default": "30",
+  "description": "Hot to Cool tier age threshold for ADLS lifecycle policy.",
+  "key": "lifecycle_cool_days",
+  "scope": "platform",
+  "status": "registered",
+  "value_type": "int"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Database name within metadata_db_server (e.g. 'lake_ingest_meta').",
+  "key": "metadata_db_database",
+  "scope": "platform",
+  "status": "registered",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "FQDN of the Azure SQL DB hosting metadata for this env (e.g. 'mycustomer-dev-sql.database.windows.net'). Drives LS_METADATA_DB; required when ADF runtime needs to Lookup v_enabled_datasets / watermark / etc.",
+  "key": "metadata_db_server",
+  "scope": "platform",
+  "status": "registered",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Bumped on each breaking schema migration.",
+  "key": "metadata_schema_version",
+  "scope": "platform",
+  "status": "registered",
+  "value_type": "int"
+ },
+ {
+  "allowed": [
+   "enabled",
+   "disabled",
+   "opt_in",
+   "dataset_decides"
+  ],
+  "default": null,
+  "description": "Env-wide enable/disable for the 'case_normalize' processor group.",
+  "key": "processor_groups.case_normalize",
+  "scope": "platform",
+  "status": "registered",
+  "value_type": "enum"
+ },
+ {
+  "allowed": [
+   "enabled",
+   "disabled",
+   "opt_in",
+   "dataset_decides"
+  ],
+  "default": null,
+  "description": "Env-wide enable/disable for the 'dedup' processor group.",
+  "key": "processor_groups.dedup",
+  "scope": "platform",
+  "status": "registered",
+  "value_type": "enum"
+ },
+ {
+  "allowed": [
+   "enabled",
+   "disabled",
+   "opt_in",
+   "dataset_decides"
+  ],
+  "default": null,
+  "description": "Env-wide enable/disable for the 'hygiene' processor group.",
+  "key": "processor_groups.hygiene",
+  "scope": "platform",
+  "status": "registered",
+  "value_type": "enum"
+ },
+ {
+  "allowed": [
+   "enabled",
+   "disabled",
+   "opt_in",
+   "dataset_decides"
+  ],
+  "default": null,
+  "description": "Env-wide enable/disable for the 'pii' processor group.",
+  "key": "processor_groups.pii",
+  "scope": "platform",
+  "status": "registered",
+  "value_type": "enum"
+ },
+ {
+  "allowed": [
+   "enabled",
+   "disabled",
+   "opt_in",
+   "dataset_decides"
+  ],
+  "default": null,
+  "description": "Env-wide enable/disable for the 'provenance' processor group.",
+  "key": "processor_groups.provenance",
+  "scope": "platform",
+  "status": "registered",
+  "value_type": "enum"
+ },
+ {
+  "allowed": [
+   "enabled",
+   "disabled",
+   "opt_in",
+   "dataset_decides"
+  ],
+  "default": null,
+  "description": "Env-wide enable/disable for the 'standardization' processor group.",
+  "key": "processor_groups.standardization",
+  "scope": "platform",
+  "status": "registered",
+  "value_type": "enum"
+ },
+ {
+  "allowed": [
+   "enabled",
+   "disabled",
+   "opt_in",
+   "dataset_decides"
+  ],
+  "default": null,
+  "description": "Env-wide enable/disable for the 'timestamp_normalize' processor group.",
+  "key": "processor_groups.timestamp_normalize",
+  "scope": "platform",
+  "status": "registered",
+  "value_type": "enum"
+ },
+ {
+  "allowed": [
+   "enabled",
+   "disabled",
+   "opt_in",
+   "dataset_decides"
+  ],
+  "default": null,
+  "description": "Env-wide enable/disable for the 'type_safety' processor group.",
+  "key": "processor_groups.type_safety",
+  "scope": "platform",
+  "status": "registered",
+  "value_type": "enum"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Extra regex patterns appended to the runner's redaction list.",
+  "key": "redaction_extra_patterns",
+  "scope": "platform",
+  "status": "registered",
+  "value_type": "json"
+ },
+ {
+  "allowed": [
+   "dev",
+   "staging",
+   "prod"
+  ],
+  "default": "prod",
+  "description": "Tag written to run_log.runtime_environment.",
+  "key": "runtime_environment",
+  "scope": "platform",
+  "status": "registered",
+  "value_type": "enum"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Default Self-Hosted IR name for *_onprem_* connection patterns.",
+  "key": "shir_name",
+  "scope": "platform",
+  "status": "registered",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Linked service name for ADF Copy staged copies.",
+  "key": "staging_linked_service",
+  "scope": "platform",
+  "status": "registered",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": "lake",
+  "description": "Default ADLS container.",
+  "key": "target_container_default",
+  "scope": "platform",
+  "status": "registered",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "ADLS Gen2 account name.",
+  "key": "target_storage_account",
+  "scope": "platform",
+  "status": "registered",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "AWS access key ID for the IAM user / role with read access to the S3 buckets. Pair with connection_secret_name (KV holds the secret access key).",
+  "key": "access_key_id",
+  "scope": "source",
+  "status": "registered",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Snowflake account identifier \u2014 e.g. 'myorg-myaccount' or 'xy12345.us-east-1'. Excludes the .snowflakecomputing.com suffix (ADF appends it).",
+  "key": "account",
+  "scope": "source",
+  "status": "registered",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": "v59.0",
+  "description": "Salesforce API version (e.g. 'v59.0'). Optional; defaults to a recent stable. Pin to a specific version to insulate against Salesforce's three-yearly release cadence.",
+  "key": "api_version",
+  "scope": "source",
+  "status": "registered",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": "lake-ingest",
+  "description": "Written to source DB session metadata for attribution.",
+  "key": "application_name",
+  "scope": "source",
+  "status": "registered",
+  "value_type": "string"
+ },
+ {
+  "allowed": [
+   "basic",
+   "connstr",
+   "wallet",
+   "oauth2_client_credentials",
+   "bearer",
+   "aws_access_key",
+   "managed_identity",
+   "app_only_secret",
+   "app_only_cert",
+   "delegated_oauth",
+   "ssh_key",
+   "key_pair",
+   "service_account"
+  ],
+  "default": null,
+  "description": "How the source authenticates; drives KV-secret shape.",
+  "key": "auth_method",
+  "scope": "source",
+  "status": "registered",
+  "value_type": "enum"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "API base, no trailing slash.",
+  "key": "base_url",
+  "scope": "source",
+  "status": "registered",
+  "value_type": "uri"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Connected App's OAuth client ID (consumer key). The customer creates a Connected App in Salesforce Setup with the OAuth 2.0 Client Credentials grant enabled, paired with connection_secret_name (KV holds the client secret / consumer secret).",
+  "key": "client_id",
+  "scope": "source",
+  "status": "registered",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "OAuth2 / AAD app client ID.",
+  "key": "client_id",
+  "scope": "source",
+  "status": "registered",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": "30",
+  "description": "TCP / handshake timeout.",
+  "key": "connect_timeout_seconds",
+  "scope": "source",
+  "status": "registered",
+  "value_type": "int"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Dispatch axis for PL_INGESTOR_INVOKER (e.g. oracle.onprem_basic).",
+  "key": "connection_pattern",
+  "scope": "source",
+  "status": "registered",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Required when auth_method != managed_identity. kv://<vault>/<secret>.",
+  "key": "connection_secret_name",
+  "scope": "source",
+  "status": "registered",
+  "value_type": "kv-ref"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Database / system username for basic auth. When set, the secret pointed to by connection_secret_name is treated as the password alone (no 'user:' prefix). When absent, the secret must be in 'user:password' form (legacy).",
+  "key": "connection_user",
+  "scope": "source",
+  "status": "registered",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Database name.",
+  "key": "database",
+  "scope": "source",
+  "status": "registered",
+  "value_type": "string"
+ },
+ {
+  "allowed": [
+   "web_api",
+   "tds"
+  ],
+  "default": null,
+  "description": "Web API (OData) or TDS endpoint.",
+  "key": "dataverse_access_mode",
+  "scope": "source",
+  "status": "registered",
+  "value_type": "enum"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "https://<env>.crm.dynamics.com/.",
+  "key": "dataverse_environment_url",
+  "scope": "source",
+  "status": "registered",
+  "value_type": "uri"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Dotted path to the records array in JSON responses (e.g. 'data', 'items', 'results'). Empty string = root is the array.",
+  "key": "default_record_path",
+  "scope": "source",
+  "status": "registered",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Free-text label.",
+  "key": "description",
+  "scope": "source",
+  "status": "registered",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "JSON list of endpoint specs: [{\"name\": \"<dataset_name>\", \"path\": \"/v1/customers\"}, ...]. Each entry maps to one logical dataset under this source.",
+  "key": "endpoints",
+  "scope": "source",
+  "status": "registered",
+  "value_type": "json"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "SaaS instance / environment URL. Salesforce: 'My Domain' URL (e.g. 'https://my-org.my.salesforce.com'). ServiceNow: instance URL (e.g. 'https://acme.service-now.com'). The ADF LS for each type maps this to its own connector field (Salesforce \u2192 environmentUrl, ServiceNow \u2192 endpoint).",
+  "key": "environment_url",
+  "scope": "source",
+  "status": "registered",
+  "value_type": "uri"
+ },
+ {
+  "allowed": null,
+  "default": "https://graph.microsoft.com/v1.0/",
+  "description": "Microsoft Graph base URL.",
+  "key": "graph_api_base",
+  "scope": "source",
+  "status": "registered",
+  "value_type": "uri"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Per-source IR override (multi-SHIR shops).",
+  "key": "integration_runtime",
+  "scope": "source",
+  "status": "registered",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Caps cross-dataset parallelism for this source.",
+  "key": "max_concurrent_datasets",
+  "scope": "source",
+  "status": "registered",
+  "value_type": "int"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Caps parallel segments hitting one source.",
+  "key": "max_concurrent_segments",
+  "scope": "source",
+  "status": "registered",
+  "value_type": "int"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "GCP project ID that owns the BigQuery datasets being read. BigQuery uses (project, dataset, table) as the 3-part fully qualified name; the framework's schema_name maps to BigQuery's dataset, table_name to BigQuery's table.",
+  "key": "project_id",
+  "scope": "source",
+  "status": "registered",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "For rest_api source types \u2014 caps requests/sec.",
+  "key": "rate_limit_rps",
+  "scope": "source",
+  "status": "registered",
+  "value_type": "int"
+ },
+ {
+  "allowed": null,
+  "default": "false",
+  "description": "Request the read replica (Azure SQL: ApplicationIntent=ReadOnly).",
+  "key": "read_replica_hint",
+  "scope": "source",
+  "status": "registered",
+  "value_type": "bool"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Snowflake role to assume at session open. Optional; the user's default role is used when absent.",
+  "key": "role",
+  "scope": "source",
+  "status": "registered",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "MANDT filter applied to multi-client HANA tables.",
+  "key": "sap_client",
+  "scope": "source",
+  "status": "registered",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Used when dataset_config.schema_name is absent.",
+  "key": "schema_default",
+  "scope": "source",
+  "status": "registered",
+  "value_type": "identifier"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "OAuth2 scope.",
+  "key": "scope",
+  "scope": "source",
+  "status": "registered",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Server FQDN (DB host or SFTP host).",
+  "key": "server",
+  "scope": "source",
+  "status": "registered",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Oracle service name (Oracle uses service_name in lieu of database; SID is legacy and not supported).",
+  "key": "service_name",
+  "scope": "source",
+  "status": "registered",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Specific drive; default is site Documents library.",
+  "key": "sharepoint_drive_id",
+  "scope": "source",
+  "status": "registered",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "https://<tenant>.sharepoint.com/sites/<name>.",
+  "key": "sharepoint_site_url",
+  "scope": "source",
+  "status": "registered",
+  "value_type": "uri"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "When targeting OneDrive instead of a site.",
+  "key": "sharepoint_user_principal_name",
+  "scope": "source",
+  "status": "registered",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Snowflake role.",
+  "key": "snowflake_role",
+  "scope": "source",
+  "status": "registered",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Snowflake compute warehouse.",
+  "key": "snowflake_warehouse",
+  "scope": "source",
+  "status": "registered",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Azure Storage account name (without .blob.core.windows.net). ADF MSI must have Storage Blob Data Reader on the account or specific container. SAS / account-key auth variants land in Phase B.",
+  "key": "storage_account",
+  "scope": "source",
+  "status": "registered",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": "true",
+  "description": "Wake dedicated pool before query if paused.",
+  "key": "synapse_auto_resume",
+  "scope": "source",
+  "status": "registered",
+  "value_type": "bool"
+ },
+ {
+  "allowed": [
+   "dedicated",
+   "serverless"
+  ],
+  "default": null,
+  "description": "dedicated SQL Pool vs serverless query.",
+  "key": "synapse_pool_kind",
+  "scope": "source",
+  "status": "registered",
+  "value_type": "enum"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Azure AD tenant.",
+  "key": "tenant_id",
+  "scope": "source",
+  "status": "registered",
+  "value_type": "string"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "OAuth2 token endpoint.",
+  "key": "token_url",
+  "scope": "source",
+  "status": "registered",
+  "value_type": "uri"
+ },
+ {
+  "allowed": null,
+  "default": null,
+  "description": "Snowflake compute warehouse to run extraction queries on.",
+  "key": "warehouse",
+  "scope": "source",
+  "status": "registered",
+  "value_type": "string"
+ }
+]

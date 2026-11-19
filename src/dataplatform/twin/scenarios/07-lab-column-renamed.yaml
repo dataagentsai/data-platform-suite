@@ -1,0 +1,62 @@
+# DataTwin scenario (G10), day 7: The lab system renames defect_code to defect in P-HUN's files from 10:00.
+# Oracle (world.yaml): the load stops naming defect_code; silver is unchanged; no nulls loaded; P-CHN's files keep
+# loading
+# FIXTURE note: the obs checks run on obs/fixture.py; ingestion and silver checks run on the engine when a
+# run of it is attached (tests/dataplatform/test_twin_engine.py); gold checks too since W1d; DES checks are pending (W1e).
+apiVersion: dwd-scenario/v0
+scenario: lab-column-renamed
+incident: lab-column-renamed
+story: schema_change
+world: slices/02-tyre/world.yaml
+discharges:
+- SCH-02
+- DPC-0008
+- OPS-01
+- OPS-06
+checks:
+- id: planted
+  layer: world
+  kind: planted
+- id: held-in-truth
+  layer: world
+  kind: oracle
+  day: 7
+  path:
+  - silver
+  - lims.inspection_result
+  - held_back_rows
+  min: 1
+- id: shown
+  layer: obs
+  kind: on_dashboard
+  dashboard: sources_ingestion
+  widget: held_files
+  match:
+    dataset: lims.inspection_result
+    status: rejected_contract
+- id: error-logged
+  layer: obs
+  kind: on_dashboard
+  dashboard: platform_health
+  widget: errors
+  match:
+    error_class: ContractMismatch
+- id: one-alert
+  layer: obs
+  kind: one_alert
+  rule: detector-fired
+  subject: lims.inspection_result/SCH-02
+  fired_day: 7
+  resolved_day: 8
+- id: contract-stops
+  layer: ingestion
+  kind: engine
+  says: the load stops naming defect_code; P-CHN's files keep loading
+  expect: verdict
+  verdict: handled
+- id: no-nulls
+  layer: silver
+  kind: engine
+  says: silver is unchanged and no nulls are loaded
+  expect: totals
+  day: 7

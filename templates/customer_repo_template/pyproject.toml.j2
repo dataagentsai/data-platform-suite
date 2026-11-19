@@ -1,0 +1,18 @@
+[project]
+name = "{{ customer.name }}-ingestion"
+version = "0.1.0"
+description = "Ingestion pipeline repo for {{ customer.display_name }}"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    # Phase 0 (local-only): use the framework via editable install.
+    # `uv sync` will pick this up alongside the explicit extras below.
+    # When ready for Phase 1 (private GitHub), pin to a tag like:
+    #   "lake-ingest @ git+ssh://git@github.com/<vendor>/LakeIngestionFramework.git@v0.1.0",
+    "lake-ingest[{{ pip_extras }}]",
+]
+
+[tool.uv.sources]
+# Pin the framework to its local checkout. Override per developer with
+# `uv sync --override` or by setting LAKE_INGEST_PATH.
+lake-ingest = { path = "{{ framework_local_path }}", editable = true }

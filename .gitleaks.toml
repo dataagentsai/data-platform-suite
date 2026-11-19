@@ -1,0 +1,33 @@
+# gitleaks configuration.
+# Default ruleset (broad coverage — Azure storage keys, JWTs, AWS keys, etc.)
+# plus a tight allowlist for synthetic test fixtures and docs examples.
+# See docs/security.md → "Secrets" for the rationale.
+
+# Inherit the maintained default ruleset; we only add allowlists below.
+[extend]
+useDefault = true
+
+# -----------------------------------------------------------------------------
+# Global allowlist
+# -----------------------------------------------------------------------------
+[allowlist]
+description = "Synthetic test fixtures and well-known doc placeholders."
+paths = [
+    # Test fixtures must use synthetic, non-functional credentials.
+    '''tests/fixtures/.*''',
+    # Generated examples in docs may contain placeholder kv:// references.
+    '''docs/.*\.md''',
+]
+
+regexes = [
+    # Well-known doc-example credentials that public scanners flag — none are real.
+    '''AKIAIOSFODNN7EXAMPLE''',
+    '''wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY''',
+    # Our format for Key Vault references is a *name*, never a secret value.
+    # The string `kv://<vault>/<secret>` is safe to commit.
+    '''kv://[a-z0-9-]+/[A-Za-z0-9-]+''',
+]
+
+commits = [
+    # Add commit SHAs here if a historical commit triggers a known false positive.
+]

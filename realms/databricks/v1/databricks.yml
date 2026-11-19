@@ -1,0 +1,104 @@
+# V1 deployed shape (TODO V1-2): the platform as one job with three tasks (ingestion, silver, gold), and a separate
+# proof driver job that plays the client and the simulated world, triggers the platform job once per day and judges
+# the day from the reports the tasks save. Its own catalogs (<env>_<layer>, env = v1) and its own metadata database,
+# so it never touches the dev catalogs the single-job proof (../engine) uses.
+#
+#   rsync -a --delete ~/data-platform-catalog/slices/02-tyre realms/databricks/v1/_catalog/slices/
+#   cd realms/databricks/v1 && databricks bundle deploy -p free
+#   databricks bundle run proof_days -p free
+bundle:
+  name: dp_v1
+
+variables:
+  env:
+    default: v1
+  meta_instance:
+    default: dp-meta-dev
+  meta_database:
+    default: dp_meta_v1
+  secret_scope:          # holds token-key, the key personal values are tokenised with (a KMS key on AWS)
+    default: dp-v1
+
+sync:
+  paths:
+    - ../../../src/dataplatform
+    - ../../../scripts
+    - ../../../models/tyre
+    - .
+  include:
+    - _catalog/**        # git-ignored (a copy of data-platform-catalog/slices/02-tyre), so listed here
+
+targets:
+  dev:
+    default: true
+    mode: development
+
+resources:
+  jobs:
+    platform_day:
+      name: dp-${var.env}-platform-day
+      max_concurrent_runs: 1
+      parameters:
+        - name: window       # the business date to load, e.g. 2026-11-09
+          default: ""
+      environments:
+        - environment_key: default
+          spec:
+            environment_version: "3"
+            dependencies:
+              - "psycopg[binary]>=3.2"
+              - "pyyaml>=6"
+      tasks:
+        - task_key: ingest
+          environment_key: default
+          spark_python_task:
+            python_file: ./tasks/hop.py
+            parameters: [--hop, ingest, --window, "{{job.parameters.window}}", --env, "${var.env}", --meta-instance,
+                         "${var.meta_instance}", --meta-database, "${var.meta_database}", --secret-scope,
+                         "${var.secret_scope}", --root, "${workspace.file_path}"]
+        - task_key: silver
+          depends_on:
+            - task_key: ingest
+          environment_key: default
+          spark_python_task:
+            python_file: ./tasks/hop.py
+            parameters: [--hop, silver, --window, "{{job.parameters.window}}", --env, "${var.env}", --meta-instance,
+                         "${var.meta_instance}", --meta-database, "${var.meta_database}", --secret-scope,
+                         "${var.secret_scope}", --root, "${workspace.file_path}"]
+        - task_key: gold
+          depends_on:
+            - task_key: silver
+          environment_key: default
+          spark_python_task:
+            python_file: ./tasks/hop.py
+            parameters: [--hop, gold, --window, "{{job.parameters.window}}", --env, "${var.env}", --meta-instance,
+                         "${var.meta_instance}", --meta-database, "${var.meta_database}", --secret-scope,
+                         "${var.secret_scope}", --root, "${workspace.file_path}"]
+
+    proof_days:
+      name: dp-${var.env}-proof-days
+      max_concurrent_runs: 1
+      parameters:
+        - name: days
+          default: "3"
+        - name: calendar            # compressed = every planted incident on days 2-3
+          default: "compressed"
+        - name: housekeeping_days   # bronze housekeeping's correction window; "" = off
+          default: "1"
+      environments:
+        - environment_key: default
+          spec:
+            environment_version: "3"
+            dependencies:
+              - "psycopg[binary]>=3.2"
+              - "pyyaml>=6"
+      tasks:
+        - task_key: days
+          environment_key: default
+          spark_python_task:
+            python_file: ./tasks/driver.py
+            parameters: [--days, "{{job.parameters.days}}", --calendar, "{{job.parameters.calendar}}",
+                         --housekeeping-days, "{{job.parameters.housekeeping_days}}", --env, "${var.env}",
+                         --meta-instance, "${var.meta_instance}", --meta-database, "${var.meta_database}",
+                         --platform-job-id, "${resources.jobs.platform_day.id}", --run-id, "{{job.run_id}}",
+                         --root, "${workspace.file_path}"]

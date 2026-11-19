@@ -1,0 +1,945 @@
+{
+  "datasets": [
+    {
+      "name": "mv_otif_otif_counter_all",
+      "displayName": "OTIF %",
+      "queryLines": [
+        "SELECT MEASURE(`OTIF %`) AS value FROM `dev_gold`.`sales`.`mv_otif`"
+      ]
+    },
+    {
+      "name": "mv_otif_otif_trend_promised_month",
+      "displayName": "OTIF % by Promised month",
+      "queryLines": [
+        "SELECT `Promised month` AS dimension, MEASURE(`OTIF %`) AS value FROM `dev_gold`.`sales`.`mv_otif` GROUP BY ALL ORDER BY dimension"
+      ]
+    },
+    {
+      "name": "mv_otif_otif_breakdown_region",
+      "displayName": "OTIF % by Region",
+      "queryLines": [
+        "SELECT `Region` AS dimension, MEASURE(`OTIF %`) AS value FROM `dev_gold`.`sales`.`mv_otif` GROUP BY ALL ORDER BY dimension"
+      ]
+    },
+    {
+      "name": "mv_otif_otif_breakdown_tyre_class",
+      "displayName": "OTIF % by Tyre class",
+      "queryLines": [
+        "SELECT `Tyre class` AS dimension, MEASURE(`OTIF %`) AS value FROM `dev_gold`.`sales`.`mv_otif` GROUP BY ALL ORDER BY dimension"
+      ]
+    },
+    {
+      "name": "mv_otif_order_lines_counter_all",
+      "displayName": "Order lines",
+      "queryLines": [
+        "SELECT MEASURE(`Order lines`) AS value FROM `dev_gold`.`sales`.`mv_otif`"
+      ]
+    },
+    {
+      "name": "mv_otif_order_lines_trend_promised_month",
+      "displayName": "Order lines by Promised month",
+      "queryLines": [
+        "SELECT `Promised month` AS dimension, MEASURE(`Order lines`) AS value FROM `dev_gold`.`sales`.`mv_otif` GROUP BY ALL ORDER BY dimension"
+      ]
+    },
+    {
+      "name": "mv_otif_order_lines_breakdown_region",
+      "displayName": "Order lines by Region",
+      "queryLines": [
+        "SELECT `Region` AS dimension, MEASURE(`Order lines`) AS value FROM `dev_gold`.`sales`.`mv_otif` GROUP BY ALL ORDER BY dimension"
+      ]
+    },
+    {
+      "name": "mv_otif_order_lines_breakdown_tyre_class",
+      "displayName": "Order lines by Tyre class",
+      "queryLines": [
+        "SELECT `Tyre class` AS dimension, MEASURE(`Order lines`) AS value FROM `dev_gold`.`sales`.`mv_otif` GROUP BY ALL ORDER BY dimension"
+      ]
+    },
+    {
+      "name": "mv_sales_sell_in_units_counter_all",
+      "displayName": "Sell-in units",
+      "queryLines": [
+        "SELECT MEASURE(`Sell-in units`) AS value FROM `dev_gold`.`sales`.`mv_sales`"
+      ]
+    },
+    {
+      "name": "mv_sales_sell_in_units_trend_month",
+      "displayName": "Sell-in units by Month",
+      "queryLines": [
+        "SELECT `Month` AS dimension, MEASURE(`Sell-in units`) AS value FROM `dev_gold`.`sales`.`mv_sales` GROUP BY ALL ORDER BY dimension"
+      ]
+    },
+    {
+      "name": "mv_sales_sell_in_units_breakdown_region",
+      "displayName": "Sell-in units by Region",
+      "queryLines": [
+        "SELECT `Region` AS dimension, MEASURE(`Sell-in units`) AS value FROM `dev_gold`.`sales`.`mv_sales` GROUP BY ALL ORDER BY dimension"
+      ]
+    },
+    {
+      "name": "mv_sales_sell_in_units_breakdown_tyre_class",
+      "displayName": "Sell-in units by Tyre class",
+      "queryLines": [
+        "SELECT `Tyre class` AS dimension, MEASURE(`Sell-in units`) AS value FROM `dev_gold`.`sales`.`mv_sales` GROUP BY ALL ORDER BY dimension"
+      ]
+    },
+    {
+      "name": "mv_sales_sell_out_units_counter_all",
+      "displayName": "Sell-out units",
+      "queryLines": [
+        "SELECT MEASURE(`Sell-out units`) AS value FROM `dev_gold`.`sales`.`mv_sales`"
+      ]
+    },
+    {
+      "name": "mv_sales_sell_out_units_trend_month",
+      "displayName": "Sell-out units by Month",
+      "queryLines": [
+        "SELECT `Month` AS dimension, MEASURE(`Sell-out units`) AS value FROM `dev_gold`.`sales`.`mv_sales` GROUP BY ALL ORDER BY dimension"
+      ]
+    },
+    {
+      "name": "mv_sales_sell_out_units_breakdown_region",
+      "displayName": "Sell-out units by Region",
+      "queryLines": [
+        "SELECT `Region` AS dimension, MEASURE(`Sell-out units`) AS value FROM `dev_gold`.`sales`.`mv_sales` GROUP BY ALL ORDER BY dimension"
+      ]
+    },
+    {
+      "name": "mv_sales_sell_out_units_breakdown_tyre_class",
+      "displayName": "Sell-out units by Tyre class",
+      "queryLines": [
+        "SELECT `Tyre class` AS dimension, MEASURE(`Sell-out units`) AS value FROM `dev_gold`.`sales`.`mv_sales` GROUP BY ALL ORDER BY dimension"
+      ]
+    }
+  ],
+  "pages": [
+    {
+      "name": "mv_otif",
+      "displayName": "Otif",
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layout": [
+        {
+          "widget": {
+            "name": "w_mv_otif_otif_counter_all",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "mv_otif_otif_counter_all",
+                  "fields": [
+                    {
+                      "name": "value",
+                      "expression": "`value`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "value",
+                  "displayName": "OTIF %"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "OTIF %"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 2,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "w_mv_otif_otif_trend_promised_month",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "mv_otif_otif_trend_promised_month",
+                  "fields": [
+                    {
+                      "name": "dimension",
+                      "expression": "`dimension`"
+                    },
+                    {
+                      "name": "value",
+                      "expression": "`value`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "dimension",
+                  "displayName": "Promised month",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fieldName": "value",
+                  "displayName": "OTIF %",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "OTIF % by Promised month"
+              }
+            }
+          },
+          "position": {
+            "x": 2,
+            "y": 0,
+            "width": 3,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "w_mv_otif_otif_breakdown_region",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "mv_otif_otif_breakdown_region",
+                  "fields": [
+                    {
+                      "name": "dimension",
+                      "expression": "`dimension`"
+                    },
+                    {
+                      "name": "value",
+                      "expression": "`value`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "dimension",
+                  "displayName": "Region",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "value",
+                  "displayName": "OTIF %",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "OTIF % by Region"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 6,
+            "width": 3,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "w_mv_otif_otif_breakdown_tyre_class",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "mv_otif_otif_breakdown_tyre_class",
+                  "fields": [
+                    {
+                      "name": "dimension",
+                      "expression": "`dimension`"
+                    },
+                    {
+                      "name": "value",
+                      "expression": "`value`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "dimension",
+                  "displayName": "Tyre class",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "value",
+                  "displayName": "OTIF %",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "OTIF % by Tyre class"
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 6,
+            "width": 3,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "w_mv_otif_order_lines_counter_all",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "mv_otif_order_lines_counter_all",
+                  "fields": [
+                    {
+                      "name": "value",
+                      "expression": "`value`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "value",
+                  "displayName": "Order lines"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Order lines"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 12,
+            "width": 2,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "w_mv_otif_order_lines_trend_promised_month",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "mv_otif_order_lines_trend_promised_month",
+                  "fields": [
+                    {
+                      "name": "dimension",
+                      "expression": "`dimension`"
+                    },
+                    {
+                      "name": "value",
+                      "expression": "`value`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "dimension",
+                  "displayName": "Promised month",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fieldName": "value",
+                  "displayName": "Order lines",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Order lines by Promised month"
+              }
+            }
+          },
+          "position": {
+            "x": 2,
+            "y": 12,
+            "width": 3,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "w_mv_otif_order_lines_breakdown_region",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "mv_otif_order_lines_breakdown_region",
+                  "fields": [
+                    {
+                      "name": "dimension",
+                      "expression": "`dimension`"
+                    },
+                    {
+                      "name": "value",
+                      "expression": "`value`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "dimension",
+                  "displayName": "Region",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "value",
+                  "displayName": "Order lines",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Order lines by Region"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 18,
+            "width": 3,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "w_mv_otif_order_lines_breakdown_tyre_class",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "mv_otif_order_lines_breakdown_tyre_class",
+                  "fields": [
+                    {
+                      "name": "dimension",
+                      "expression": "`dimension`"
+                    },
+                    {
+                      "name": "value",
+                      "expression": "`value`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "dimension",
+                  "displayName": "Tyre class",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "value",
+                  "displayName": "Order lines",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Order lines by Tyre class"
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 18,
+            "width": 3,
+            "height": 6
+          }
+        }
+      ]
+    },
+    {
+      "name": "mv_sales",
+      "displayName": "Sales",
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layout": [
+        {
+          "widget": {
+            "name": "w_mv_sales_sell_in_units_counter_all",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "mv_sales_sell_in_units_counter_all",
+                  "fields": [
+                    {
+                      "name": "value",
+                      "expression": "`value`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "value",
+                  "displayName": "Sell-in units"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Sell-in units"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 2,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "w_mv_sales_sell_in_units_trend_month",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "mv_sales_sell_in_units_trend_month",
+                  "fields": [
+                    {
+                      "name": "dimension",
+                      "expression": "`dimension`"
+                    },
+                    {
+                      "name": "value",
+                      "expression": "`value`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "dimension",
+                  "displayName": "Month",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fieldName": "value",
+                  "displayName": "Sell-in units",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Sell-in units by Month"
+              }
+            }
+          },
+          "position": {
+            "x": 2,
+            "y": 0,
+            "width": 3,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "w_mv_sales_sell_in_units_breakdown_region",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "mv_sales_sell_in_units_breakdown_region",
+                  "fields": [
+                    {
+                      "name": "dimension",
+                      "expression": "`dimension`"
+                    },
+                    {
+                      "name": "value",
+                      "expression": "`value`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "dimension",
+                  "displayName": "Region",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "value",
+                  "displayName": "Sell-in units",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Sell-in units by Region"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 6,
+            "width": 3,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "w_mv_sales_sell_in_units_breakdown_tyre_class",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "mv_sales_sell_in_units_breakdown_tyre_class",
+                  "fields": [
+                    {
+                      "name": "dimension",
+                      "expression": "`dimension`"
+                    },
+                    {
+                      "name": "value",
+                      "expression": "`value`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "dimension",
+                  "displayName": "Tyre class",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "value",
+                  "displayName": "Sell-in units",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Sell-in units by Tyre class"
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 6,
+            "width": 3,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "w_mv_sales_sell_out_units_counter_all",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "mv_sales_sell_out_units_counter_all",
+                  "fields": [
+                    {
+                      "name": "value",
+                      "expression": "`value`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "value",
+                  "displayName": "Sell-out units"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Sell-out units"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 12,
+            "width": 2,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "w_mv_sales_sell_out_units_trend_month",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "mv_sales_sell_out_units_trend_month",
+                  "fields": [
+                    {
+                      "name": "dimension",
+                      "expression": "`dimension`"
+                    },
+                    {
+                      "name": "value",
+                      "expression": "`value`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "dimension",
+                  "displayName": "Month",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fieldName": "value",
+                  "displayName": "Sell-out units",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Sell-out units by Month"
+              }
+            }
+          },
+          "position": {
+            "x": 2,
+            "y": 12,
+            "width": 3,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "w_mv_sales_sell_out_units_breakdown_region",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "mv_sales_sell_out_units_breakdown_region",
+                  "fields": [
+                    {
+                      "name": "dimension",
+                      "expression": "`dimension`"
+                    },
+                    {
+                      "name": "value",
+                      "expression": "`value`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "dimension",
+                  "displayName": "Region",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "value",
+                  "displayName": "Sell-out units",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Sell-out units by Region"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 18,
+            "width": 3,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "w_mv_sales_sell_out_units_breakdown_tyre_class",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "mv_sales_sell_out_units_breakdown_tyre_class",
+                  "fields": [
+                    {
+                      "name": "dimension",
+                      "expression": "`dimension`"
+                    },
+                    {
+                      "name": "value",
+                      "expression": "`value`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "dimension",
+                  "displayName": "Tyre class",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "value",
+                  "displayName": "Sell-out units",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Sell-out units by Tyre class"
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 18,
+            "width": 3,
+            "height": 6
+          }
+        }
+      ]
+    }
+  ],
+  "uiSettings": {
+    "theme": {
+      "widgetHeaderAlignment": "LEFT"
+    }
+  }
+}

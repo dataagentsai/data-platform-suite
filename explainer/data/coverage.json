@@ -1,0 +1,681 @@
+{
+ "catalog": "40d7067",
+ "date": "2026-11-19",
+ "rules": {
+  "X1": [
+   {
+    "id": "CFG-01",
+    "level": "MUST",
+    "state": "built",
+    "title": "Everything that runs was declared"
+   },
+   {
+    "id": "CFG-02",
+    "level": "MUST",
+    "state": "built",
+    "title": "Cross-cutting concerns are on by default"
+   },
+   {
+    "id": "CFG-04",
+    "level": "MUST",
+    "state": "tested",
+    "title": "The control plane is changed only through its declared operations"
+   },
+   {
+    "id": "CFG-05",
+    "level": "MUST",
+    "state": "tested",
+    "title": "An unknown or misplaced setting is rejected, never ignored"
+   },
+   {
+    "id": "ENG-01",
+    "level": "MUST",
+    "state": "none",
+    "title": "Platform tables are written only by the shared engines"
+   },
+   {
+    "id": "BLD-01",
+    "level": "MUST",
+    "state": "none",
+    "title": "Per-table code holds only the business rule"
+   },
+   {
+    "id": "ENG-02",
+    "level": "MUST",
+    "state": "tested",
+    "title": "Every bronze-to-silver engine runs the same stages and passes the same proof"
+   }
+  ],
+  "X10": [
+   {
+    "id": "COST-02",
+    "level": "MUST",
+    "state": "built",
+    "title": "Platform cost guardrails"
+   },
+   {
+    "id": "COST-03",
+    "level": "MUST",
+    "state": "none",
+    "title": "Cost can be traced to a team and a job"
+   },
+   {
+    "id": "COST-04",
+    "level": "SHOULD",
+    "state": "none",
+    "title": "No compute running when nothing needs it"
+   }
+  ],
+  "X11": [
+   {
+    "id": "ENC-01",
+    "level": "MUST",
+    "state": "none",
+    "title": "Data at rest is encrypted with separate keys and never public"
+   },
+   {
+    "id": "ENV-02",
+    "level": "MUST",
+    "state": "tested",
+    "title": "Access through groups and service identities"
+   },
+   {
+    "id": "REL-05",
+    "level": "MUST",
+    "state": "tested",
+    "title": "No secrets in the repository"
+   },
+   {
+    "id": "SEC-02",
+    "level": "MUST",
+    "state": "tested",
+    "title": "Who can see what"
+   }
+  ],
+  "X12": [
+   {
+    "id": "PII-01",
+    "level": "MUST",
+    "state": "built",
+    "title": "Personal data is protected before it is first stored"
+   },
+   {
+    "id": "SEC-01",
+    "level": "MUST",
+    "state": "tested",
+    "title": "Personal and sensitive data found and classified"
+   },
+   {
+    "id": "SEC-03",
+    "level": "MUST",
+    "state": "tested",
+    "title": "Retention and the right to be forgotten"
+   }
+  ],
+  "X13": [
+   {
+    "id": "CAT-01",
+    "level": "MUST",
+    "state": "tested",
+    "title": "The catalog says what the metadata says"
+   },
+   {
+    "id": "NAME-01",
+    "level": "SHOULD",
+    "state": "built",
+    "title": "Table names follow one declared pattern"
+   },
+   {
+    "id": "SERV-04",
+    "level": "MUST",
+    "state": "tested",
+    "title": "Business definitions live in one place"
+   },
+   {
+    "id": "ML-01",
+    "level": "MUST",
+    "state": "none",
+    "title": "A machine learning model is a data product"
+   },
+   {
+    "id": "SERV-06",
+    "level": "MUST",
+    "state": "tested",
+    "title": "Conversation interfaces and agents use certified metrics only"
+   },
+   {
+    "id": "ONT-01",
+    "level": "SHOULD",
+    "state": "none",
+    "title": "Business concepts are written down once"
+   }
+  ],
+  "X14": [
+   {
+    "id": "CFG-03",
+    "level": "MUST",
+    "state": "none",
+    "title": "Every run records the configuration it ran under"
+   },
+   {
+    "id": "FILE-01",
+    "level": "MUST",
+    "state": "tested",
+    "title": "Every delivered file ends with a recorded outcome"
+   },
+   {
+    "id": "OPS-03",
+    "level": "MUST",
+    "state": "tested",
+    "title": "Every run leaves a record"
+   },
+   {
+    "id": "SEC-04",
+    "level": "MUST",
+    "state": "built",
+    "title": "Access is audited"
+   },
+   {
+    "id": "RSTM-01",
+    "level": "MUST",
+    "state": "tested",
+    "title": "A published number that changes is recorded"
+   }
+  ],
+  "X15": [
+   {
+    "id": "DUP-01",
+    "level": "MUST",
+    "state": "tested",
+    "title": "Same batch or file arriving twice"
+   },
+   {
+    "id": "DUP-02",
+    "level": "MUST",
+    "state": "tested",
+    "title": "Rerunning a job leaves the result unchanged"
+   },
+   {
+    "id": "DUP-04",
+    "level": "MUST",
+    "state": "tested",
+    "title": "Replayed events in a stream"
+   },
+   {
+    "id": "GOLD-01",
+    "level": "MUST",
+    "state": "tested",
+    "title": "Derived tables are replaced by window, never appended"
+   },
+   {
+    "id": "HIST-03",
+    "level": "MUST",
+    "state": "none",
+    "title": "Handing over from history load to incremental loads"
+   },
+   {
+    "id": "HIST-04",
+    "level": "MUST",
+    "state": "tested",
+    "title": "Reloading or backfilling a past period"
+   },
+   {
+    "id": "IDEMP-01",
+    "level": "MUST",
+    "state": "tested",
+    "title": "Each layer declares what makes its write idempotent"
+   },
+   {
+    "id": "KEY-01",
+    "level": "MUST",
+    "state": "tested",
+    "title": "Surrogate keys are the same on every rebuild"
+   },
+   {
+    "id": "LATE-01",
+    "level": "MUST",
+    "state": "tested",
+    "title": "Late and corrected rows rebuild the right periods"
+   },
+   {
+    "id": "ORCH-03",
+    "level": "MUST",
+    "state": "tested",
+    "title": "Restart after failing in the middle"
+   },
+   {
+    "id": "RAW-01",
+    "level": "MUST",
+    "state": "tested",
+    "title": "The first kept layer holds every record as delivered"
+   },
+   {
+    "id": "SCD-02",
+    "level": "MUST",
+    "state": "tested",
+    "title": "History rows stay correct on reruns and out-of-order changes"
+   },
+   {
+    "id": "HIST-05",
+    "level": "MUST",
+    "state": "tested",
+    "title": "Corrections reach gold only through a backfill plan"
+   },
+   {
+    "id": "WM-01",
+    "level": "MUST",
+    "state": "none",
+    "title": "Watermarks are safe to rely on"
+   },
+   {
+    "id": "VOID-01",
+    "level": "MUST",
+    "state": "tested",
+    "title": "A bad batch can be withdrawn"
+   }
+  ],
+  "X16": [
+   {
+    "id": "ENV-01",
+    "level": "MUST",
+    "state": "none",
+    "title": "Separate environments with separate data"
+   },
+   {
+    "id": "REL-01",
+    "level": "MUST",
+    "state": "built",
+    "title": "Everything that runs is in version control"
+   },
+   {
+    "id": "REL-02",
+    "level": "MUST",
+    "state": "none",
+    "title": "Branching and code review"
+   },
+   {
+    "id": "REL-03",
+    "level": "MUST",
+    "state": "none",
+    "title": "Automated promotion of the same build"
+   },
+   {
+    "id": "REL-04",
+    "level": "MUST",
+    "state": "none",
+    "title": "Configuration per environment, not in code"
+   },
+   {
+    "id": "REL-06",
+    "level": "SHOULD",
+    "state": "none",
+    "title": "Infrastructure defined as code"
+   }
+  ],
+  "X17": [
+   {
+    "id": "PURE-01",
+    "level": "MUST",
+    "state": "tested",
+    "title": "Transform logic is separate from reads and writes"
+   },
+   {
+    "id": "TEST-03",
+    "level": "MUST",
+    "state": "tested",
+    "title": "Automated tests run on every change"
+   },
+   {
+    "id": "TEST-05",
+    "level": "MUST",
+    "state": "tested",
+    "title": "Failure, rerun and recovery tested on purpose"
+   },
+   {
+    "id": "DIFF-01",
+    "level": "MUST",
+    "state": "tested",
+    "title": "A change is compared with today's output before release"
+   },
+   {
+    "id": "INSP-01",
+    "level": "SHOULD",
+    "state": "tested",
+    "title": "Developers can see every step"
+   }
+  ],
+  "X18": [
+   {
+    "id": "ORCH-05",
+    "level": "MUST",
+    "state": "tested",
+    "title": "Recovery time and data loss limits"
+   },
+   {
+    "id": "ORCH-06",
+    "level": "MUST",
+    "state": "none",
+    "title": "Stream restarts from where it stopped"
+   },
+   {
+    "id": "REL-07",
+    "level": "MUST",
+    "state": "none",
+    "title": "Rolling back a release, including its data"
+   },
+   {
+    "id": "RET-01",
+    "level": "MUST",
+    "state": "tested",
+    "title": "Bronze ages out only behind a checked baseline"
+   }
+  ],
+  "X19": [
+   {
+    "id": "PERF-05",
+    "level": "SHOULD",
+    "state": "tested",
+    "title": "Storage layout and file sizes kept healthy"
+   },
+   {
+    "id": "AGG-01",
+    "level": "SHOULD",
+    "state": "none",
+    "title": "Pre-aggregates exist only for a named question"
+   }
+  ],
+  "X2": [
+   {
+    "id": "ORCH-01",
+    "level": "MUST",
+    "state": "tested",
+    "title": "Jobs wait for their data, not the clock"
+   },
+   {
+    "id": "ORCH-02",
+    "level": "MUST",
+    "state": "tested",
+    "title": "Retries for passing failures only"
+   },
+   {
+    "id": "ORCH-04",
+    "level": "MUST",
+    "state": "tested",
+    "title": "Two runs writing the same table at once"
+   }
+  ],
+  "X20": [
+   {
+    "id": "HEAL-01",
+    "level": "MUST",
+    "state": "none",
+    "title": "A self-healing fix goes through the same gates"
+   }
+  ],
+  "X21": [
+   {
+    "id": "GATE-03",
+    "level": "MUST",
+    "state": "none",
+    "title": "Agents propose, gates decide"
+   }
+  ],
+  "X22": [
+   {
+    "id": "SIM-01",
+    "level": "MUST",
+    "state": "tested",
+    "title": "Every incident kind has a planted test"
+   }
+  ],
+  "X3": [
+   {
+    "id": "DES-04",
+    "level": "MUST",
+    "state": "none",
+    "title": "Grain and keys of every table"
+   },
+   {
+    "id": "GATE-02",
+    "level": "MUST",
+    "state": "none",
+    "title": "A contract is never loosened to make a job pass"
+   },
+   {
+    "id": "ING-01",
+    "level": "MUST",
+    "state": "built",
+    "title": "Every way into bronze passes the same entry steps"
+   },
+   {
+    "id": "PROJ-01",
+    "level": "MUST",
+    "state": "tested",
+    "title": "Every contract column reaches silver unless a selection is declared"
+   },
+   {
+    "id": "SCH-01",
+    "level": "MUST",
+    "state": "tested",
+    "title": "A new column appears at the source"
+   },
+   {
+    "id": "SCH-02",
+    "level": "MUST",
+    "state": "tested",
+    "title": "A column renamed, removed or retyped"
+   },
+   {
+    "id": "SERV-01",
+    "level": "MUST",
+    "state": "tested",
+    "title": "A contract with each consumer"
+   },
+   {
+    "id": "DIM-01",
+    "level": "MUST",
+    "state": "none",
+    "title": "Conformed dimensions are built once and shared"
+   },
+   {
+    "id": "FACT-01",
+    "level": "MUST",
+    "state": "none",
+    "title": "Every fact declares its kind and how its rows change"
+   },
+   {
+    "id": "MEAS-01",
+    "level": "MUST",
+    "state": "none",
+    "title": "Every measure says how it adds up"
+   }
+  ],
+  "X4": [
+   {
+    "id": "DQ-01",
+    "level": "MUST",
+    "state": "tested",
+    "title": "Data quality rules written with owners"
+   },
+   {
+    "id": "DQ-02",
+    "level": "MUST",
+    "state": "tested",
+    "title": "What happens to a row that fails a rule"
+   },
+   {
+    "id": "DQ-03",
+    "level": "MUST",
+    "state": "tested",
+    "title": "One poison record does not stop the whole load"
+   },
+   {
+    "id": "DUP-03",
+    "level": "MUST",
+    "state": "tested",
+    "title": "Duplicates already inside the source"
+   },
+   {
+    "id": "GATE-01",
+    "level": "MUST",
+    "state": "tested",
+    "title": "Nothing passes by absence"
+   },
+   {
+    "id": "LATE-02",
+    "level": "MUST",
+    "state": "tested",
+    "title": "Facts arriving before their reference data"
+   },
+   {
+    "id": "LATE-04",
+    "level": "MUST",
+    "state": "none",
+    "title": "Time zones and business dates"
+   },
+   {
+    "id": "PUB-01",
+    "level": "MUST",
+    "state": "tested",
+    "title": "Derived tables pass their own checks before publish"
+   },
+   {
+    "id": "QUAR-01",
+    "level": "MUST",
+    "state": "none",
+    "title": "A released row goes through the same checks again"
+   },
+   {
+    "id": "SCD-04",
+    "level": "SHOULD",
+    "state": "none",
+    "title": "Facts joined to the right version of history"
+   },
+   {
+    "id": "SEV-01",
+    "level": "MUST",
+    "state": "built",
+    "title": "A rule's severity decides what happens on failure"
+   },
+   {
+    "id": "JOIN-01",
+    "level": "MUST",
+    "state": "tested",
+    "title": "A lookup join never adds or loses rows"
+   }
+  ],
+  "X5": [
+   {
+    "id": "PROF-01",
+    "level": "SHOULD",
+    "state": "none",
+    "title": "Every dataset is profiled and drift is visible"
+   }
+  ],
+  "X6": [
+   {
+    "id": "DEL-01",
+    "level": "MUST",
+    "state": "tested",
+    "title": "Detecting hard deletes at the source"
+   },
+   {
+    "id": "DEL-03",
+    "level": "MUST",
+    "state": "tested",
+    "title": "Deletes flow through derived tables"
+   },
+   {
+    "id": "REC-01",
+    "level": "MUST",
+    "state": "tested",
+    "title": "Counts and totals reconciled layer by layer"
+   },
+   {
+    "id": "REC-03",
+    "level": "MUST",
+    "state": "none",
+    "title": "Tolerances and who signs off differences"
+   },
+   {
+    "id": "REC-05",
+    "level": "MUST",
+    "state": "tested",
+    "title": "Reconciliation names the hop that drifted"
+   },
+   {
+    "id": "DEL-04",
+    "level": "MUST",
+    "state": "tested",
+    "title": "A full copy that would delete too much is held, not loaded"
+   },
+   {
+    "id": "LEDG-01",
+    "level": "MUST",
+    "state": "tested",
+    "title": "Every run keeps a row ledger"
+   }
+  ],
+  "X7": [
+   {
+    "id": "FLOW-01",
+    "level": "MUST",
+    "state": "built",
+    "title": "Data flows one way through the layers"
+   },
+   {
+    "id": "LIN-01",
+    "level": "MUST",
+    "state": "tested",
+    "title": "Every hop emits lineage"
+   }
+  ],
+  "X8": [
+   {
+    "id": "OPS-01",
+    "level": "MUST",
+    "state": "tested",
+    "title": "Alerts reach someone who can act"
+   },
+   {
+    "id": "OPS-06",
+    "level": "SHOULD",
+    "state": "tested",
+    "title": "Alerts are few enough to be read"
+   }
+  ],
+  "X9": [
+   {
+    "id": "DQ-04",
+    "level": "MUST",
+    "state": "built",
+    "title": "A source goes quiet or sends far too little"
+   },
+   {
+    "id": "LATE-03",
+    "level": "SHOULD",
+    "state": "tested",
+    "title": "Event time, watermarks and late events in streams"
+   },
+   {
+    "id": "PERF-02",
+    "level": "MUST",
+    "state": "none",
+    "title": "Freshness target measured end to end"
+   },
+   {
+    "id": "SERV-02",
+    "level": "MUST",
+    "state": "none",
+    "title": "Consumers can tell whether data is complete"
+   },
+   {
+    "id": "COMP-01",
+    "level": "MUST",
+    "state": "tested",
+    "title": "A window is complete only when everything owed has arrived"
+   }
+  ]
+ },
+ "suite": "32c3bf8"
+}

@@ -1,0 +1,28 @@
+# Alert rules as configuration (OPS-06, DPC-0056). Reviewed in the pull request like any other config.
+# A domain may override this file; it names no product (R1).
+#
+# signals:   run_failed     a dataset run ended failed
+#            freshness      a dataset (or one of its bookmarks) is past its error target (sla_freshness_error_hours)
+#            detector       a detector fired in a run (step detect.<DAC id>): handled (warned) or blocked (failed)
+#            check_failed   a quality or reconciliation check failed (step quality.* / recon.*)
+#            heartbeat      the synthetic heartbeat row did not arrive in time (DPC-0058)
+# routes:    by the data product's tier. `to` names the manifest's owners (owners.alerts is the rota).
+# tiers:     overrides per dataset; otherwise tier comes from the freshness error target
+#            (<= 4 h: tier 1, <= 48 h: tier 2, else tier 3).
+# snoozes:   each needs rule, subject (a glob), reason, owner and until (with a time zone), at most
+#            snooze_max_days ahead. An expired snooze is ignored and the alert returns.
+version: 1
+business_timezone: Asia/Kolkata
+rules:
+  - {id: run-failed, signal: run_failed, title: A dataset run failed}
+  - {id: freshness-breach, signal: freshness, title: Data is older than its error target}
+  - {id: detector-fired, signal: detector, title: A detector fired on a load}
+  - {id: check-failed, signal: check_failed, title: A quality or reconciliation check failed}
+  - {id: heartbeat-missing, signal: heartbeat, title: The heartbeat did not arrive}
+routes:
+  1: {channel: page, to: owners.alerts}
+  2: {channel: ticket, to: owners.alerts}
+  3: {channel: digest, to: owners.dataset}
+tiers: {}
+snooze_max_days: 30
+snoozes: []

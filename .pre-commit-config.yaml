@@ -1,0 +1,124 @@
+# Pre-commit hooks: catch quality-gate violations before they reach CI.
+# Setup once: `uv run pre-commit install`
+# See docs/quality_gates.md for rationale.
+
+repos:
+  # ---------------------------------------------------------------------
+  # Ruff — lint + format
+  # ---------------------------------------------------------------------
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.5.0
+    hooks:
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+      - id: ruff-format
+
+  # ---------------------------------------------------------------------
+  # mypy — strict types
+  # ---------------------------------------------------------------------
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.10.0
+    hooks:
+      - id: mypy
+        # Match the framework's runtime + dev deps so mypy sees the right stubs
+        # and decorated symbols (typer's @app.command() etc.).
+        additional_dependencies:
+          - pydantic>=2.6
+          - typer>=0.12
+          - types-pyyaml
+          - types-requests
+        # Run only when there are Python files staged; mypy fails on no targets.
+        files: ^src/.*\.py$
+
+  # ---------------------------------------------------------------------
+  # Bandit — Python SAST
+  # ---------------------------------------------------------------------
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.7.9
+    hooks:
+      - id: bandit
+        args: ["-c", "pyproject.toml"]
+        additional_dependencies: ["bandit[toml]"]
+        files: ^src/.*\.py$
+
+  # ---------------------------------------------------------------------
+  # gitleaks — secret scanning
+  # ---------------------------------------------------------------------
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.18.4
+    hooks:
+      - id: gitleaks
+
+  # ---------------------------------------------------------------------
+  # sqlfluff — T-SQL DDL + procs
+  # ---------------------------------------------------------------------
+  - repo: https://github.com/sqlfluff/sqlfluff
+    rev: 4.1.0
+    hooks:
+      - id: sqlfluff-lint
+        args: ["--dialect", "tsql"]
+        files: \.sql$
+        # Exclude SQLite-flavored stand-in schemas; lint only canonical T-SQL.
+        exclude: |
+          (?x)^(
+            src/lake_ingestion_framework/core/metadata/schema_sqlite\.sql|
+            src/lake_ingestion_framework/realms/adf_adls/runtime_sql/(views|tables)/sqlite/.*\.sql
+          )$
+
+  # ---------------------------------------------------------------------
+  # Generic file hygiene
+  # ---------------------------------------------------------------------
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-toml
+      - id: check-added-large-files
+        args: ["--maxkb=512"]
+      - id: check-merge-conflict
+      - id: detect-private-key
+
+  # ---------------------------------------------------------------------
+  # Semgrep — custom project rules. Local hook so we use the version
+  # the dev installed via `uv sync --extra dev`.
+  # ---------------------------------------------------------------------
+  - repo: local
+    hooks:
+      - id: semgrep
+        name: semgrep
+        entry: semgrep --config p/python --config .semgrep.yml --error --quiet
+        language: system
+        pass_filenames: false
+        # Only run when Python source actually exists; avoids noise on doc-only PRs.
+        files: ^src/.*\.py$
+
+  # ---------------------------------------------------------------------
+  # Shift-left bundle — the hook the bundle ships (.pre-commit-hooks.yaml),
+  # with its entry set to the same scan as the aws-databricks workflow's
+  # shift-left job, so a blocking finding stops the commit instead of
+  # turning CI red. Runs only when the kernel or the realm changes.
+  # Same scan by hand: `make shiftleft`; the whole workflow: `make ci-local`.
+  # ---------------------------------------------------------------------
+  - repo: https://github.com/dataagentsai/shift-left-bundle
+    rev: 874baf13d988feb90eaf5074c47c6a3e1493efc3  # no tags yet; bump on purpose
+    hooks:
+      - id: shiftleft-commit
+        name: shiftleft (aws-databricks workflow scan)
+        entry: >-
+          shiftleft scan src/dataplatform --stage pr
+          --baseline realms/aws-databricks/shiftleft-baseline.json
+        language_version: python3.12
+        always_run: false
+        files: ^(src/dataplatform|realms/aws-databricks)/
+        # The bundle's [tools] extra, as CI installs it (the PySpark checks come from sparkdoctor / pyspark-antipattern).
+        additional_dependencies:
+          - ruff==0.17.3
+          - sqlfluff==4.5.0
+          - vulture==2.16
+          - complexipy==8.3.0
+          - nbstripout==0.9.1
+          - sparkdoctor==0.1.8
+          - pyspark-antipattern==0.4.1
+          - sqlglot==30.27.0

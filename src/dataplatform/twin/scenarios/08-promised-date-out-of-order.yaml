@@ -1,0 +1,42 @@
+# DataTwin scenario (G10), day 8: A promised-date change for a day-2 line arrives with a change sequence older than
+# one already loaded.
+# Oracle (world.yaml): the line has exactly one current version holding the newest change, with no overlapping
+# periods
+# FIXTURE note: the obs checks run on obs/fixture.py; ingestion and silver checks run on the engine when a
+# run of it is attached (tests/dataplatform/test_twin_engine.py); gold checks too since W1d; DES checks are pending (W1e).
+apiVersion: dwd-scenario/v0
+scenario: promised-date-out-of-order
+incident: promised-date-out-of-order
+story: out_of_order
+world: slices/02-tyre/world.yaml
+discharges:
+- SCD-02
+- DPC-0025
+- DPC-0026
+- OPS-01
+- OPS-06
+checks:
+- id: planted
+  layer: world
+  kind: planted
+- id: shown
+  layer: obs
+  kind: on_dashboard
+  dashboard: platform_health
+  widget: steps_not_passed
+  match:
+    dataset: erp.sales_order_line
+    step: detect.SCD-02
+- id: one-alert
+  layer: obs
+  kind: one_alert
+  rule: detector-fired
+  subject: erp.sales_order_line/SCD-02
+  fired_day: 8
+  resolved_day: 9
+- id: one-current
+  layer: silver
+  kind: engine
+  says: the line has exactly one current version holding the newest change, no overlapping periods
+  expect: verdict
+  verdict: handled

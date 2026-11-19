@@ -1,0 +1,49 @@
+# DataTwin scenario (G10), day 12: The change feed silently skips 7 delivery rows during a source maintenance
+# window.
+# Oracle (world.yaml): the live-source-against-silver entry fails that night, names the hop sources to landing, and
+# drills to the 7 keys
+# FIXTURE note: the obs checks run on obs/fixture.py; ingestion and silver checks run on the engine when a
+# run of it is attached (tests/dataplatform/test_twin_engine.py); gold checks too since W1d; DES checks are pending (W1e).
+apiVersion: dwd-scenario/v0
+scenario: change-feed-drops-rows
+incident: change-feed-drops-rows
+story: recon_mismatch
+world: slices/02-tyre/world.yaml
+discharges:
+- REC-05
+- DPC-0052
+- DPC-0015
+- OPS-01
+- OPS-06
+checks:
+- id: planted
+  layer: world
+  kind: planted
+- id: seven-missing
+  layer: world
+  kind: oracle
+  day: 12
+  path:
+  - silver
+  - erp.delivery
+  - missing_keys
+  length: 7
+- id: shown
+  layer: obs
+  kind: on_dashboard
+  dashboard: platform_health
+  widget: steps_not_passed
+  match:
+    dataset: erp.delivery
+    step: recon.live_source_vs_silver
+- id: one-alert
+  layer: obs
+  kind: one_alert
+  rule: check-failed
+  subject: erp.delivery/recon.live_source_vs_silver
+  fired_day: 12
+  resolved_day: 13
+- id: recon-entry
+  layer: des
+  kind: engine
+  says: the live-source-against-silver entry fails that night, names the hop sources to landing and drills to the 7 keys

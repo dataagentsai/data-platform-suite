@@ -1,0 +1,86 @@
+# Test customer profile A — simple Microsoft-shop, RDBMS + SFTP
+#
+# A mid-size Microsoft-aligned customer with on-prem SQL Server and
+# external-partner SFTP file drops. No SaaS, no cloud DW, no nested
+# data, no AI/RAG content. Demonstrates the minimum viable framework
+# deployment.
+#
+# Used as a fixture in tests/examples/dummycustomera/ for the
+# framework's L3 end-to-end tests. Also shipped as a starter template
+# for new customers with similar profiles.
+
+# ─── Identity ──────────────────────────────────────────────────────────
+customer:
+  name: dummycustomera
+  display_name: "DummyCustomer A, Inc."
+  primary_contact: ops@dummycustomera.example
+  cost_center: "DC-A-DataPlatform"
+
+# ─── Environments ──────────────────────────────────────────────────────
+environments:
+  - name: dev
+    storage_account: dummycustomeradevsa
+    container: lake
+    metadata_db_server: dummycustomera-dev-sql.database.windows.net
+    metadata_db_database: lake_ingest_meta
+    region: westeurope
+  - name: uat
+    storage_account: dummycustomerauatsa
+    container: lake
+    metadata_db_server: dummycustomera-uat-sql.database.windows.net
+    metadata_db_database: lake_ingest_meta
+    region: westeurope
+  - name: prod
+    storage_account: dummycustomeraprodsa
+    container: lake
+    metadata_db_server: dummycustomera-prod-sql.database.windows.net
+    metadata_db_database: lake_ingest_meta
+    region: westeurope
+
+# ─── Sources ───────────────────────────────────────────────────────────
+sources:
+  - source_type: sql_server
+    connection_patterns: [onprem_basic, onprem_aad]
+    requires_shir: true
+  - source_type: sftp
+    connection_patterns: [private_key]
+    requires_shir: true                         # SFTP server is on the partner's VPN
+
+# ─── Features ──────────────────────────────────────────────────────────
+features:
+  segmented_loads: true                         # one ~50M-row orders table
+  flattening: false                             # all tabular RDBMS / CSV
+  document_dataset_type: false                  # no PDFs / Word
+  cross_account_files: false                    # no cross-account ADLS / Blob
+  rest_api_generic: false                       # no REST sources
+  saas_apis: false                              # no Salesforce / Dataverse
+  cloud_dw: false                               # no Snowflake / BigQuery
+  sap_hana: false                               # no SAP
+  heartbeat_pipeline: true                      # weekly canary
+  auto_retry_on_partial: false                  # operator-driven restart
+  pii_classification: true                      # required by compliance
+
+# ─── Constraints ───────────────────────────────────────────────────────
+constraints:
+  no_azure_functions: true                      # customer policy: no consumption Functions
+  no_databricks: true                           # no Databricks workspace
+  msi_only: false                               # SQL Server uses on-prem AD, not MSI
+  private_endpoint_required: true
+  cmk_required: false                           # PMK is sufficient
+  egress_to_internet: false                     # in-VNet only
+  shir_only_for_onprem: true                    # explicit; no auto-resolve fallback
+  no_public_blob_access: true                   # ADLS public access denied
+
+# ─── Compliance ────────────────────────────────────────────────────────
+compliance:
+  pii_required: true
+  data_residency: westeurope
+  retention_minimum_days: 365                   # 1 year minimum
+  audit_log_retention_years: 7                  # SOX-style
+
+# ─── Slim trim preferences ─────────────────────────────────────────────
+trim:
+  include_runbooks: true
+  include_test_doctor: true
+  include_heartbeat_test: true
+  include_examples: true

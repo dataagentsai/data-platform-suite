@@ -1,0 +1,276 @@
+# Project + tool configs.
+# See docs/quality_gates.md (mechanical gates), docs/code_design.md
+# (design rules), and docs/customer_profile.md (extras structure).
+
+[project]
+name = "lake-ingest"
+version = "0.1.0.dev0"
+description = "Metadata-driven framework for ingesting data into a lakehouse, pluggable across realms."
+readme = "README.md"
+requires-python = ">=3.11"
+# License deferred — see ADR 0004 amendment. No license = "all rights reserved" by default.
+authors = [{ name = "LakeIngestionFramework contributors" }]
+keywords = ["azure", "data-factory", "lakehouse", "ingestion", "adls", "metadata-driven"]
+dependencies = [
+    "pydantic>=2.6",
+    "typer>=0.12",
+    "pyyaml>=6.0",
+    "rich>=13.0",                                 # CLI output formatting (transitive via typer)
+    "jinja2>=3.1",                                # template rendering for `lake-ingest init`
+]
+
+[project.scripts]
+lake-ingest = "lake_ingestion_framework.cli:main"
+
+[project.optional-dependencies]
+# Customers install only the extras their profile declares — see
+# docs/customer_profile.md. The framework's own CI installs `[all]`
+# for full coverage.
+
+# ── Realm extras ──
+adf         = []                              # ADF generator + runner; deps land here
+databricks  = []                              # future realm
+local       = ["deltalake>=0.18", "pyarrow>=15"]  # local-mode writer + ADF Mimic; pure-OSS, no Spark / no Azure
+gold_dev    = ["dbt-core>=1.7.0", "dbt-databricks>=1.7.0"]  # dbt + Databricks adapter; only for `dbt parse` smoke validation, not runtime
+lineage     = ["openlineage-python>=1.10"]                     # OpenLineage event emission (manifest → events; HTTP transport optional)
+dq          = ["duckdb>=0.10", "pytz>=2024.1"]                 # DQ engine v1 — local SQL evaluator (`DuckdbEvaluator`); pytz for tz-aware timestamps in pyarrow→duckdb registration
+azure       = ["azure-storage-blob>=12.19", "azure-keyvault-secrets>=4.8", "azure-identity>=1.15"]  # Azure cloud adapters (adapters/azure_blob.py, AzureKeyVault); the SDK is imported lazily, never at module import
+
+# ── Per-source-type extras ──
+azure_sql_db     = ["pyodbc>=5.0"]             # via Microsoft ODBC Driver 18 (system install)
+sql_server       = ["pyodbc>=5.0"]             # same driver as azure_sql_db
+oracle           = ["oracledb>=2.0"]           # thin mode — pure Python, no Instant Client
+postgres         = ["psycopg[binary]>=3.1"]    # psycopg3 — binary wheel ships libpq
+mysql            = ["pymysql>=1.1"]            # pure Python; works with MySQL + MariaDB
+sap_hana         = ["hdbcli>=2.18"]            # SAP-official HANA Python driver; for `discover` (Phase B), ADF runtime uses HANA driver directly
+snowflake        = ["snowflake-connector-python>=3.0"]  # Snowflake driver; Python connector for `discover` lands in Phase B
+bigquery         = ["google-cloud-bigquery>=3.20"]      # GCP client; Python connector for `discover` lands in Phase B
+synapse_sql_pool = []                         # pyodbc + AAD, TBD
+rest_api         = ["httpx>=0.27"]             # modern HTTP client; pure Python wheels
+salesforce       = ["simple-salesforce>=1.12"]  # for `discover` (Phase B); ADF runtime uses Salesforce REST/Bulk v2 directly
+servicenow       = ["httpx>=0.27"]              # ServiceNow Table API (REST); for `discover` (Phase B); ADF runtime uses ADF's ServiceNow connector directly
+dataverse        = []                         # MSAL + msgraph-core, TBD
+sftp             = ["paramiko>=3.0"]           # SSH/SFTP; binary wheels via cryptography
+adls_gen2_x      = []                         # azure-storage-file-datalake, TBD
+azure_blob_x     = ["azure-storage-blob>=12.19"]  # for `discover` (Phase B); ADF runtime uses MSI directly
+s3               = ["boto3>=1.34"]             # AWS SDK; Python connector for `discover` lands in Phase B
+https_pull       = []                         # httpx-based, TBD
+sharepoint       = []                         # MSAL + msgraph-core, TBD
+
+# ── Meta-extras (groupings) ──
+rdbms        = ["lake-ingest[azure_sql_db,sql_server,oracle,postgres,mysql]"]
+cloud_dw     = ["lake-ingest[snowflake,bigquery,synapse_sql_pool]"]
+saas         = ["lake-ingest[rest_api,salesforce,servicenow,dataverse]"]
+files        = ["lake-ingest[sftp,adls_gen2_x,azure_blob_x,s3,https_pull,sharepoint]"]
+azure_native = ["lake-ingest[adf,azure_sql_db,adls_gen2_x,azure_blob_x]"]
+all          = ["lake-ingest[adf,rdbms,cloud_dw,saas,files,sap_hana,dq]"]
+
+# Dev tooling. Single source of truth for the security gate stack.
+dev = [
+    "ruff>=0.5.0,<1",
+    "mypy>=1.10",
+    "bandit[toml]>=1.7.9",
+    "semgrep>=1.70",
+    "pip-audit>=2.7",
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+    "sqlfluff>=3.0",
+    "cyclonedx-bom>=4.0",
+    "pre-commit>=3.7",
+    "pyyaml>=6.0",                            # for parsing customer profiles in tests
+    "types-pyyaml>=6.0",                      # mypy stubs
+]
+
+[build-system]
+requires = ["hatchling>=1.21"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/lake_ingestion_framework"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src/", "templates/", "README.md", "pyproject.toml"]
+
+# ---------------------------------------------------------------------------
+# Ruff — lint + format. See docs/quality_gates.md.
+# ---------------------------------------------------------------------------
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = [
+    "E", "W",        # pycodestyle
+    "F",             # pyflakes
+    "I",             # isort
+    "B",             # flake8-bugbear (security-relevant patterns)
+    "S",             # flake8-bandit subset
+    "UP",            # pyupgrade
+    "PL",            # pylint
+    "PT",            # flake8-pytest-style
+    "SIM",           # flake8-simplify
+    "T20",           # flake8-print
+    "TID",           # flake8-tidy-imports
+    "RUF",           # ruff-specific
+]
+ignore = [
+    # generator APIs are intentionally kwarg-heavy for forward-compat
+    "PLR0913",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = [
+    "S101",                                     # asserts in tests are fine
+    "PLR2004",                                  # magic numbers in tests are fine
+    "S105", "S106", "S107",                     # fixture / default-arg "secrets" are not real
+    "S108",                                     # /tmp paths in tests are intentional
+    "PLC0415",                                  # lazy imports inside tests are fine (extras-gated checks)
+    "SIM105",                                   # try/except/pass for cleanup is clearer than contextlib.suppress in tests
+    "PLR0915",                                  # smoke tests reading top-to-bottom > splitting into helpers
+]
+"scripts/**" = [
+    "T201",                                     # print() is the point in demo / inspection scripts
+    "PLC0415",                                  # lazy imports inside scripts (extras-gated)
+    "PLR0915",                                  # demo `main()` reads top-to-bottom; refactoring would obscure
+    "PLR0912",                                  # demo main()'s branches mirror the stages; flat reads cleaner
+    "S603", "S607",                             # subprocess for Docker / dbt by name — local demos, not user input
+    "S108",                                     # /tmp paths in demo scripts are intentional defaults
+]
+"src/**/__init__.py" = ["F401", "PLC0414"]      # re-exports + explicit `as` re-export aliases
+"src/lake_ingestion_framework/cli.py" = [
+    "B008",                                     # typer.Option/Argument idiom
+    "PLC0415",                                  # in-function imports keep CLI startup fast
+    "PLR0912",                                  # CLI handlers fan out to many help / error branches; flat reads cleanest
+    "PLR0915",                                  # CLI handlers walk linearly through option → result; splitting hides intent
+]
+"src/lake_ingestion_framework/core/metadata/keys/_lookup.py" = [
+    "PLR0911", "PLR0912",                       # parse_value's branches mirror KeyType members
+]
+# Modules with lazy imports gated on optional extras — keeps the framework
+# importable without [postgres] / [local] / etc. The function-local imports
+# are intentional; PLC0415 is too aggressive here.
+"src/lake_ingestion_framework/core/silver/pipeline.py" = ["PLC0415"]
+"src/lake_ingestion_framework/core/dq/actions.py" = ["PLC0415"]  # lazy deltalake import (DeltaSideTableWriter), gated on [local] extra
+"src/lake_ingestion_framework/core/dq/spark_evaluator.py" = ["PLR0911"]  # evaluate() branches mirror sample_cap modes (>0 / 0 / -1) × pass/fail; consolidating obscures the cheap-eval semantics
+"src/lake_ingestion_framework/core/processors/dedup.py" = ["PLR0911"]  # apply_dedup branches mirror DedupMode members; flat reads cleanest
+"src/lake_ingestion_framework/core/lineage/dbt_manifest.py" = ["PLC0415"]
+"src/lake_ingestion_framework/core/lineage/_ol.py" = ["PLC0415"]
+"src/lake_ingestion_framework/core/gold/generator.py" = [
+    "S608",                                     # f-strings render dbt SQL templates, not runtime queries; identifiers are _IDENTIFIER_RE-validated
+    "PLR0912",                                  # _validate_model walks every config dimension; splitting hides the per-field locality
+]
+"src/lake_ingestion_framework/core/writers/local_delta.py" = ["PLC0415"]
+"src/lake_ingestion_framework/core/source_connectors/factory.py" = [
+    "PLC0415",                                  # lazy imports per source_type — by design
+]
+"src/lake_ingestion_framework/core/source_connectors/postgres.py" = [
+    "PLC0415",                                  # lazy psycopg import is the entire point of the helper
+]
+"src/lake_ingestion_framework/core/source_connectors/mssql.py" = [
+    "PLC0415",                                  # lazy pyodbc import — same pattern
+]
+"src/lake_ingestion_framework/core/source_connectors/sftp.py" = [
+    "PLC0415",                                  # lazy paramiko import + stat (used inside _is_dir)
+    "PLR0911",                                  # _infer_jsonl_type's branches mirror JSON value kinds
+]
+"src/lake_ingestion_framework/core/source_connectors/mysql.py" = [
+    "PLC0415",                                  # lazy pymysql import is the entire point of the helper
+]
+"src/lake_ingestion_framework/core/source_connectors/oracle.py" = [
+    "PLC0415",                                  # lazy oracledb import is the entire point of the helper
+]
+"src/lake_ingestion_framework/core/source_connectors/rest_api.py" = [
+    "PLC0415",                                  # lazy httpx import is the entire point of the helper
+]
+"src/lake_ingestion_framework/core/source_connectors/_jsonl_inference.py" = [
+    "PLR0911",                                  # _infer_value_type's branches mirror JSON value kinds
+]
+"src/lake_ingestion_framework/realms/adf_adls/generator/assemble.py" = [
+    "PLR0912",                                  # plan_artifacts walks 6 source types × multiple resource kinds
+    "PLR0915",                                  # plan_artifacts is a long sequential assembly — splitting hurts readability
+]
+"src/lake_ingestion_framework/core/use_cases/deploy.py" = [
+    "PLC0415",                                  # lazy import of the realm generator package
+]
+
+# ---------------------------------------------------------------------------
+# mypy — strict from day one.
+# ---------------------------------------------------------------------------
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_unreachable = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+disallow_untyped_decorators = true
+disallow_any_generics = true
+no_implicit_reexport = true
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+disallow_untyped_defs = false
+
+# Third-party SDKs frequently lack type stubs; ignore until they ship them.
+# psycopg has stubs but is only present when the [postgres] extra is installed —
+# mypy in CI / fresh venvs without the extra would otherwise fail.
+[[tool.mypy.overrides]]
+module = [
+    "azure.identity.*",
+    "azure.keyvault.*",
+    "azure.storage.*",
+    "azure.mgmt.*",
+    "pyodbc.*",
+    "psycopg",
+    "psycopg.*",
+    "paramiko",
+    "paramiko.*",
+    "pymysql",
+    "pymysql.*",
+    "oracledb",
+    "oracledb.*",
+    "httpx",
+    "httpx.*",
+    "deltalake",
+    "deltalake.*",
+    "pyarrow",
+    "pyarrow.*",
+]
+ignore_missing_imports = true
+
+# ---------------------------------------------------------------------------
+# Bandit — Python SAST. Configured via pyproject so a single file holds all.
+# ---------------------------------------------------------------------------
+[tool.bandit]
+exclude_dirs = ["tests", ".venv", "build", "dist", "adf_artifacts"]
+# Don't blanket-skip rules; suppress per-line with "# nosec B<id>: <reason>".
+skips = []
+
+# ---------------------------------------------------------------------------
+# pytest + coverage.
+# ---------------------------------------------------------------------------
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+addopts = "-ra --strict-markers --strict-config -m 'not integration and not smoke'"
+markers = [
+    "integration: requires an external service (Docker / Azure / etc.); skipped by default. Run with -m integration.",
+    "smoke: end-to-end against a real Docker source DB; skipped by default. Run with -m smoke.",
+    "slow: minutes, not seconds (the 14-day world through ingestion); runs in make world-test, -m 'not slow' skips it.",
+]
+
+[tool.coverage.run]
+branch = true
+source = ["src/lake_ingestion_framework"]
+
+[tool.coverage.report]
+# Bar to merge: 80% on core/, 60% on each realm package. CI enforces this
+# via per-path thresholds when the coverage layout stabilizes.
+# v0.x: ratchet up gradually as the codebase grows.
+fail_under = 80
+exclude_lines = [
+    "pragma: no cover",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+    "if __name__ == .__main__.:",
+]

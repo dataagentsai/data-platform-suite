@@ -1,0 +1,85 @@
+{
+ "business_timezone": "Asia/Kolkata",
+ "datasets": [
+  {
+   "dataset": "dealer",
+   "is_enabled": true,
+   "schedule_cron": "0 */6 * * *",
+   "schedule_timezone": "Asia/Kolkata",
+   "schedule_trigger": "cron",
+   "source": "dealer_api"
+  },
+  {
+   "dataset": "delivery",
+   "is_enabled": true,
+   "schedule_cron": "*/15 * * * *",
+   "schedule_timezone": "Asia/Kolkata",
+   "schedule_trigger": "cron",
+   "source": "erp"
+  },
+  {
+   "dataset": "material",
+   "is_enabled": true,
+   "schedule_cron": "0 1 * * *",
+   "schedule_timezone": "Asia/Kolkata",
+   "schedule_trigger": "cron",
+   "source": "erp"
+  },
+  {
+   "dataset": "sales_order_line",
+   "is_enabled": true,
+   "schedule_cron": "*/15 * * * *",
+   "schedule_timezone": "Asia/Kolkata",
+   "schedule_trigger": "cron",
+   "source": "erp"
+  },
+  {
+   "dataset": "inspection_result",
+   "is_enabled": true,
+   "schedule_timezone": "Europe/Budapest",
+   "schedule_trigger": "on_delivery",
+   "source": "lims"
+  },
+  {
+   "dataset": "press",
+   "is_enabled": true,
+   "schedule_cron": "0 1 * * *",
+   "schedule_timezone": "Asia/Kolkata",
+   "schedule_trigger": "cron",
+   "source": "mes"
+  },
+  {
+   "dataset": "production",
+   "is_enabled": true,
+   "schedule_cron": "*/15 * * * *",
+   "schedule_timezone": "Asia/Kolkata",
+   "schedule_trigger": "cron",
+   "source": "mes"
+  },
+  {
+   "dataset": "dealer_sellout",
+   "is_enabled": true,
+   "schedule_timezone": "Asia/Kolkata",
+   "schedule_trigger": "on_delivery",
+   "source": "partner"
+  },
+  {
+   "dataset": "press_reading",
+   "is_enabled": true,
+   "schedule_cron": "*/15 * * * *",
+   "schedule_timezone": "Asia/Kolkata",
+   "schedule_trigger": "cron",
+   "source": "press_stream"
+  }
+ ],
+ "domain": "tyre",
+ "gold": [
+  "dim_dealer",
+  "dim_material",
+  "dim_press",
+  "fact_otif",
+  "fact_sales",
+  "fact_scrap"
+ ],
+ "slice": "02-tyre"
+}

@@ -1,0 +1,321 @@
+{
+  "datasets": [
+    {
+      "displayName": "duration",
+      "name": "performance__duration",
+      "queryLines": [
+        "SELECT `dataset`, MEASURE(`avg_duration_s`) AS `avg_duration_s`, MEASURE(`max_duration_s`) AS `max_duration_s`\n",
+        "FROM `dev_ops`.`ops`.`mv_ops_dataset_runs`\n",
+        "GROUP BY `dataset`\n",
+        "ORDER BY `dataset`"
+      ]
+    },
+    {
+      "displayName": "steps",
+      "name": "performance__steps",
+      "queryLines": [
+        "SELECT `step`, MEASURE(`avg_step_s`) AS `avg_step_s`\n",
+        "FROM `dev_ops`.`ops`.`mv_ops_step_time`\n",
+        "WHERE `kind` = 'pipeline'\n",
+        "GROUP BY `step`\n",
+        "ORDER BY `step`"
+      ]
+    },
+    {
+      "displayName": "slow",
+      "name": "performance__slow",
+      "queryLines": [
+        "SELECT `day`, `dataset`, `duration_s`, `duration_ratio`, `origin`, `run_id`\n",
+        "FROM `dev_ops`.`ops`.`ops_dataset_runs`\n",
+        "WHERE `slow` = TRUE\n",
+        "ORDER BY `day`"
+      ]
+    },
+    {
+      "displayName": "retries daily",
+      "name": "performance__retries_daily",
+      "queryLines": [
+        "SELECT `day`, `dataset`, MEASURE(`retries`) AS `retries`\n",
+        "FROM `dev_ops`.`ops`.`mv_ops_dataset_runs`\n",
+        "WHERE `retry` = 1\n",
+        "GROUP BY `day`, `dataset`\n",
+        "ORDER BY `day`, `dataset`"
+      ]
+    }
+  ],
+  "pages": [
+    {
+      "displayName": "Performance",
+      "layout": [
+        {
+          "position": {
+            "height": 2,
+            "width": 6,
+            "x": 0,
+            "y": 0
+          },
+          "widget": {
+            "multilineTextboxSpec": {
+              "lines": [
+                "## Performance\n",
+                "\n",
+                "Where does each load spend its time, and is it getting slower? Time per dataset and per step, runs at least twice their own usual time, and re-runs. Only what needs the run log: job-level performance is the platform's own job monitoring screen, and spend belongs to the separate cost product.\n",
+                "\n",
+                "Owned by observability. Built from the ops metric views over the compact ops tables (run log, daily telemetry copy, freshness, alerts), joined by run id. Discharges DPC-0057, OPS-03."
+              ]
+            },
+            "name": "about"
+          }
+        },
+        {
+          "position": {
+            "height": 6,
+            "width": 3,
+            "x": 0,
+            "y": 2
+          },
+          "widget": {
+            "name": "time",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "performance__duration",
+                  "disaggregated": true,
+                  "fields": [
+                    {
+                      "expression": "`dataset`",
+                      "name": "dataset"
+                    },
+                    {
+                      "expression": "`avg_duration_s`",
+                      "name": "avg_duration_s"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "encodings": {
+                "x": {
+                  "displayName": "dataset",
+                  "fieldName": "dataset",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "displayName": "avg duration s",
+                  "fieldName": "avg_duration_s",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Average and longest run time per dataset (s)"
+              },
+              "version": 3,
+              "widgetType": "bar"
+            }
+          }
+        },
+        {
+          "position": {
+            "height": 6,
+            "width": 3,
+            "x": 3,
+            "y": 2
+          },
+          "widget": {
+            "name": "step_time",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "performance__steps",
+                  "disaggregated": true,
+                  "fields": [
+                    {
+                      "expression": "`step`",
+                      "name": "step"
+                    },
+                    {
+                      "expression": "`avg_step_s`",
+                      "name": "avg_step_s"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "encodings": {
+                "x": {
+                  "displayName": "step",
+                  "fieldName": "step",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "displayName": "avg step s",
+                  "fieldName": "avg_step_s",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Average time per pipeline step (s)"
+              },
+              "version": 3,
+              "widgetType": "bar"
+            }
+          }
+        },
+        {
+          "position": {
+            "height": 6,
+            "width": 3,
+            "x": 0,
+            "y": 8
+          },
+          "widget": {
+            "name": "retries",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "performance__retries_daily",
+                  "disaggregated": true,
+                  "fields": [
+                    {
+                      "expression": "`day`",
+                      "name": "day"
+                    },
+                    {
+                      "expression": "`retries`",
+                      "name": "retries"
+                    },
+                    {
+                      "expression": "`dataset`",
+                      "name": "dataset"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "encodings": {
+                "color": {
+                  "displayName": "dataset",
+                  "fieldName": "dataset",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "x": {
+                  "displayName": "day",
+                  "fieldName": "day",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "displayName": "retries",
+                  "fieldName": "retries",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Re-runs per day by dataset"
+              },
+              "version": 3,
+              "widgetType": "bar"
+            }
+          }
+        },
+        {
+          "position": {
+            "height": 6,
+            "width": 6,
+            "x": 0,
+            "y": 14
+          },
+          "widget": {
+            "name": "slow_runs",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "performance__slow",
+                  "disaggregated": true,
+                  "fields": [
+                    {
+                      "expression": "`day`",
+                      "name": "day"
+                    },
+                    {
+                      "expression": "`dataset`",
+                      "name": "dataset"
+                    },
+                    {
+                      "expression": "`duration_s`",
+                      "name": "duration_s"
+                    },
+                    {
+                      "expression": "`duration_ratio`",
+                      "name": "duration_ratio"
+                    },
+                    {
+                      "expression": "`origin`",
+                      "name": "origin"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "encodings": {
+                "columns": [
+                  {
+                    "displayName": "day",
+                    "fieldName": "day"
+                  },
+                  {
+                    "displayName": "dataset",
+                    "fieldName": "dataset"
+                  },
+                  {
+                    "displayName": "duration s",
+                    "fieldName": "duration_s"
+                  },
+                  {
+                    "displayName": "duration ratio",
+                    "fieldName": "duration_ratio"
+                  },
+                  {
+                    "displayName": "origin",
+                    "fieldName": "origin"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Slow-downs: runs at least twice their usual time"
+              },
+              "version": 1,
+              "widgetType": "table"
+            }
+          }
+        }
+      ],
+      "name": "performance"
+    }
+  ]
+}

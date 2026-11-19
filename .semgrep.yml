@@ -1,0 +1,157 @@
+# Project-specific Semgrep rules.
+# Run alongside the public Python pack:
+#   semgrep --config p/python --config .semgrep.yml --error src/
+# These encode framework invariants from docs/security.md and docs/performance.md
+# as machine-checked rules so reviewers don't have to remember them.
+
+rules:
+  # -------------------------------------------------------------------------
+  # SQL-injection prevention (security.md → SQL-injection prevention)
+  # -------------------------------------------------------------------------
+  - id: no-fstring-sql
+    pattern-either:
+      - pattern: $CURSOR.execute(f"...")
+      - pattern: $CURSOR.executemany(f"...")
+      - pattern: $CONN.execute(f"...")
+    message: >
+      f-string in SQL execute() — use parameter binding. See
+      docs/security.md → "SQL-injection prevention".
+    severity: ERROR
+    languages: [python]
+
+  - id: no-string-concat-sql
+    pattern-either:
+      - pattern: $CURSOR.execute("..." + $X)
+      - pattern: $CURSOR.execute($X + "...")
+      - pattern: $CURSOR.execute("..." % $X)
+      - pattern: $CURSOR.execute("...".format(...))
+    message: >
+      String building in SQL execute() — use parameter binding (? or @name).
+    severity: ERROR
+    languages: [python]
+
+  - id: no-percent-format-sql
+    pattern: $CURSOR.execute("...%s..." % $X)
+    message: "%-formatted SQL — use parameter binding."
+    severity: ERROR
+    languages: [python]
+
+  # -------------------------------------------------------------------------
+  # Secret hygiene (security.md → Secrets)
+  # Resolved connection strings should not flow across module boundaries.
+  # The realm runner resolves Key Vault refs locally; passing the resolved
+  # value as a kwarg makes the secret visible in every caller's stack frame.
+  # -------------------------------------------------------------------------
+  - id: no-resolved-secret-as-kwarg
+    pattern-either:
+      - pattern: |
+          def $FN(..., connection_string=$X, ...): ...
+      - pattern: |
+          def $FN(..., password=$X, ...): ...
+      - pattern: |
+          def $FN(..., access_key=$X, ...): ...
+      - pattern: |
+          def $FN(..., sas_token=$X, ...): ...
+    message: >
+      Don't pass resolved secrets across functions. Pass the Key Vault
+      reference name; resolve once at the runner boundary. See
+      docs/security.md → "Secrets".
+    severity: WARNING
+    languages: [python]
+    paths:
+      include:
+        - "src/lake_ingestion_framework/core/**"
+
+  # -------------------------------------------------------------------------
+  # Logging hygiene (security.md → Logging hygiene)
+  # -------------------------------------------------------------------------
+  - id: no-print
+    pattern: print(...)
+    message: "Use the framework logger, not print()."
+    severity: WARNING
+    languages: [python]
+    paths:
+      exclude:
+        - "tests/**"
+        - "examples/**"
+        - "scripts/**"
+
+  - id: no-broad-except-pass
+    pattern: |
+      try:
+        ...
+      except Exception:
+        pass
+    message: >
+      Bare `except Exception: pass` swallows failures including security-
+      relevant ones. Catch the specific type, or log + re-raise.
+    severity: ERROR
+    languages: [python]
+
+  - id: no-bare-except
+    pattern: |
+      try:
+        ...
+      except:
+        ...
+    message: >
+      Bare `except:` catches KeyboardInterrupt and SystemExit too. Use
+      `except Exception:` at minimum, or a specific type.
+    severity: ERROR
+    languages: [python]
+
+  # -------------------------------------------------------------------------
+  # Forbidden APIs (security.md → Code patterns the framework forbids)
+  # -------------------------------------------------------------------------
+  - id: no-eval
+    pattern-either:
+      - pattern: eval(...)
+      - pattern: exec(...)
+    message: "eval/exec — arbitrary code execution. Use safe-listed dispatch."
+    severity: ERROR
+    languages: [python]
+
+  - id: no-pickle-load
+    pattern-either:
+      - pattern: pickle.load(...)
+      - pattern: pickle.loads(...)
+    message: "pickle.load is unsafe on untrusted input. Use JSON / pydantic."
+    severity: ERROR
+    languages: [python]
+
+  - id: no-yaml-load
+    pattern: yaml.load(...)
+    message: "yaml.load without SafeLoader is unsafe. Use yaml.safe_load."
+    severity: ERROR
+    languages: [python]
+
+  - id: no-shell-true
+    pattern-either:
+      - pattern: subprocess.run(..., shell=True, ...)
+      - pattern: subprocess.Popen(..., shell=True, ...)
+      - pattern: subprocess.call(..., shell=True, ...)
+      - pattern: os.system(...)
+    message: "shell=True / os.system enables shell injection. Use list args."
+    severity: ERROR
+    languages: [python]
+
+  - id: no-tls-verify-false
+    pattern-either:
+      - pattern: requests.get(..., verify=False, ...)
+      - pattern: requests.post(..., verify=False, ...)
+      - pattern: requests.request(..., verify=False, ...)
+    message: "verify=False disables TLS validation. Always verify."
+    severity: ERROR
+    languages: [python]
+
+  - id: no-assert-for-runtime-checks
+    # Asserts are stripped under `python -O`. Use them in tests, not runtime.
+    pattern: assert $COND, ...
+    message: >
+      `assert` is stripped under `python -O`. For runtime checks raise
+      a real exception. (Tests are excluded.)
+    severity: WARNING
+    languages: [python]
+    paths:
+      exclude:
+        - "tests/**"

@@ -1,0 +1,21 @@
+# The ops dashboards (ours: only what the platform cannot show; native.yml lists what is adopted instead).
+# They read the ops metric views in <env>_ops.ops, which the engine job writes after every run (engine bundle,
+# tasks/run_days.py). Generate first (generate.py --catalog <env>_ops), then:
+#
+#   cd realms/databricks/dashboards && databricks bundle deploy -p free
+#   python enable_anomaly_detection.py --profile free --env dev   # the adopted freshness/completeness monitor
+bundle:
+  name: dp_ops_dashboards
+
+include:
+  - resources.yml
+
+variables:
+  warehouse_id:
+    lookup:
+      warehouse: "Serverless Starter Warehouse"
+
+targets:
+  dev:
+    default: true
+    mode: development

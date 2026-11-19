@@ -1,0 +1,49 @@
+# DataTwin scenario (G10), day 10: The sales team records that 12 lines from day 2 were always promised a day later,
+# as 12 rows in the metadata store's corrections table (ADR-017, DPC-0082); a backfill plan activates them on day
+# 11. The ERP is not changed: the correction records come from that table, never from a source system.
+# Oracle (world.yaml): silver is unchanged; on day 11 only the promised-date windows of the 12 corrected lines are
+# rebuilt (each line's date as first promised and its corrected date, one day later); no other window changes; OTIF
+# equals the corrected truth
+# FIXTURE note: the obs checks run on obs/fixture.py; ingestion and silver checks run on the engine when a
+# run of it is attached (tests/dataplatform/test_twin_engine.py); gold checks too since W1d; DES checks are pending (W1e).
+apiVersion: dwd-scenario/v0
+scenario: promised-date-corrected
+incident: promised-date-corrected
+story: correction
+world: slices/02-tyre/world.yaml
+discharges:
+- HIST-05
+- DPC-0082
+- OPS-01
+- OPS-06
+checks:
+- id: planted
+  layer: world
+  kind: planted
+- id: shown
+  layer: obs
+  kind: on_dashboard
+  dashboard: platform_health
+  widget: steps_not_passed
+  match:
+    dataset: erp.sales_order_line
+    step: detect.HIST-05
+- id: one-alert
+  layer: obs
+  kind: one_alert
+  rule: detector-fired
+  subject: erp.sales_order_line/HIST-05
+  fired_day: 10
+  resolved_day: 11
+- id: windows
+  layer: gold
+  kind: engine
+  says: on day 11 only the promised-date windows of the 12 corrected lines are rebuilt; OTIF equals the corrected truth
+  expect: verdict
+  verdict: handled
+- id: silver-same
+  layer: silver
+  kind: engine
+  says: silver is unchanged by the correction
+  expect: totals
+  day: 10

@@ -1,0 +1,3314 @@
+{
+  "datasets": [
+    {
+      "name": "c980521d",
+      "displayName": "[SELECT] Yes/No for interactive clusters",
+      "queryLines": [
+        "select explode(array(\n",
+        "  'Yes',\n",
+        "  'No'\n",
+        ")) as include_all_clusters\n"
+      ]
+    },
+    {
+      "name": "069df21d",
+      "displayName": "[SELECT] Time key",
+      "queryLines": [
+        "select\n",
+        "  explode(array('Day', 'Week', 'Month')) as time_key"
+      ]
+    },
+    {
+      "name": "f5da4429",
+      "displayName": "[Overview] Daily Finished Jobs",
+      "queryLines": [
+        "with job_runs AS (\n",
+        "  SELECT\n",
+        "    date_trunc('QUARTER', period_end_time) as usage_quarter,\n",
+        "    date_trunc('MONTH', period_end_time) as usage_month,\n",
+        "    date_trunc('WEEK', period_end_time) as usage_week,\n",
+        "    date_trunc('DAY', period_end_time) as usage_day,\n",
+        "    t1.*\n",
+        "  FROM\n",
+        "    system.lakeflow.job_run_timeline t1 left JOIN system.access.workspaces_latest t2 USING (workspace_id)\n",
+        "  WHERE\n",
+        "    (period_end_time BETWEEN :param_start_date AND :param_end_date)\n",
+        "    AND IF(:param_workspace = '<ALL WORKSPACES>', true, workspace_name = :param_workspace)\n",
+        ")\n",
+        "SELECT\n",
+        "  identifier(\n",
+        "    case\n",
+        "      when :param_time_key = 'Quarter' then 'usage_quarter'\n",
+        "      when :param_time_key = 'Month' then 'usage_month'\n",
+        "      when :param_time_key = 'Week' then 'usage_week'\n",
+        "      when :param_time_key = 'Day' then 'usage_day'\n",
+        "      else 'usage_day'\n",
+        "    end\n",
+        "  ) as time_key,\n",
+        "  *\n",
+        "FROM\n",
+        "  job_runs"
+      ],
+      "parameters": [
+        {
+          "displayName": "param_start_date",
+          "keyword": "param_start_date",
+          "dataType": "DATE",
+          "defaultSelection": {
+            "values": {
+              "dataType": "DATE",
+              "values": [
+                {
+                  "value": "now-60d/d"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "param_end_date",
+          "keyword": "param_end_date",
+          "dataType": "DATE",
+          "defaultSelection": {
+            "values": {
+              "dataType": "DATE",
+              "values": [
+                {
+                  "value": "now/d"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "param_workspace",
+          "keyword": "param_workspace",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": "<ALL WORKSPACES>"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "param_time_key",
+          "keyword": "param_time_key",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": "Day"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3b209ef5",
+      "displayName": "[Operational Observability] Highest Failure Jobs",
+      "queryLines": [
+        "with usage_with_cost as (\n",
+        "  SELECT\n",
+        "    t1.*,\n",
+        "    t1.identity_metadata.run_as,\n",
+        "    t1.usage_quantity * list_prices.pricing.default as list_cost\n",
+        "  FROM\n",
+        "    system.billing.usage t1\n",
+        "      INNER JOIN system.billing.list_prices list_prices\n",
+        "        on t1.cloud = list_prices.cloud\n",
+        "        and t1.sku_name = list_prices.sku_name\n",
+        "        and t1.usage_start_time >= list_prices.price_start_time\n",
+        "        and (\n",
+        "          t1.usage_end_time <= list_prices.price_end_time\n",
+        "          or list_prices.price_end_time is null\n",
+        "        )\n",
+        "  WHERE\n",
+        "    (t1.usage_date BETWEEN :param_start_date AND :param_end_date)\n",
+        "    AND if(:param_workspace = '<ALL WORKSPACES>', true, workspace_id = :param_workspace)\n",
+        "),\n",
+        "most_recent_jobs as (\n",
+        "  SELECT\n",
+        "    *,\n",
+        "    ROW_NUMBER() OVER (PARTITION BY workspace_id, job_id ORDER BY change_time DESC) as rn\n",
+        "  FROM\n",
+        "    system.lakeflow.jobs\n",
+        "  WHERE\n",
+        "    if(:param_workspace = '<ALL WORKSPACES>', true, workspace_id = :param_workspace)\n",
+        "  QUALIFY\n",
+        "    rn = 1\n",
+        "),\n",
+        "job_run_timeline_with_cost as (\n",
+        "  SELECT\n",
+        "    t1.*,\n",
+        "    t2.job_id,\n",
+        "    t2.run_id,\n",
+        "    t2.result_state\n",
+        "  FROM\n",
+        "    usage_with_cost t1\n",
+        "      INNER JOIN system.lakeflow.job_run_timeline t2\n",
+        "        ON t1.workspace_id = t2.workspace_id\n",
+        "        AND t1.usage_metadata.job_id = t2.job_id\n",
+        "        AND t1.usage_metadata.job_run_id = t2.run_id\n",
+        "        AND t1.usage_start_time >= date_trunc(\"Hour\", t2.period_start_time)\n",
+        "        AND t1.usage_start_time < date_trunc(\"Hour\", t2.period_end_time) + INTERVAL 1 HOUR\n",
+        "),\n",
+        "cumulative_run_status_cost as (\n",
+        "  SELECT\n",
+        "    *,\n",
+        "    SUM(list_cost) OVER (\n",
+        "        ORDER BY workspace_id, job_id, run_id, usage_end_time\n",
+        "        ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW\n",
+        "      ) AS cumulative_cost\n",
+        "  FROM\n",
+        "    job_run_timeline_with_cost\n",
+        "),\n",
+        "cost_per_status as (\n",
+        "  SELECT\n",
+        "    *,\n",
+        "    cumulative_cost\n",
+        "    - COALESCE(\n",
+        "      LAG(cumulative_cost) OVER (ORDER BY workspace_id, job_id, run_id, usage_end_time), 0\n",
+        "    ) AS result_state_cost\n",
+        "  FROM\n",
+        "    cumulative_run_status_cost\n",
+        "  WHERE\n",
+        "    result_state IS NOT NULL\n",
+        "),\n",
+        "cost_per_status_agg as (\n",
+        "  SELECT\n",
+        "    workspace_id,\n",
+        "    job_id,\n",
+        "    first(run_as, TRUE) as run_as,\n",
+        "    SUM(result_state_cost) as list_cost\n",
+        "  FROM\n",
+        "    cost_per_status\n",
+        "  WHERE\n",
+        "    result_state IN ('ERROR', 'FAILED', 'TIMED_OUT')\n",
+        "  GROUP BY\n",
+        "    ALL\n",
+        "),\n",
+        "terminal_statues as (\n",
+        "  SELECT\n",
+        "    workspace_id,\n",
+        "    job_id,\n",
+        "    CASE\n",
+        "      WHEN result_state IN ('ERROR', 'FAILED', 'TIMED_OUT') THEN 1\n",
+        "      ELSE 0\n",
+        "    END as is_failure,\n",
+        "    period_end_time as last_seen_date\n",
+        "  FROM\n",
+        "    system.lakeflow.job_run_timeline\n",
+        "  WHERE\n",
+        "    result_state IS NOT NULL\n",
+        "    AND period_end_time >= :param_start_date\n",
+        "),\n",
+        "output AS (\n",
+        "  SELECT\n",
+        "    first(t2.name, true) as name,\n",
+        "    t1.workspace_id,\n",
+        "    t1.job_id,\n",
+        "    COUNT(*) as runs,\n",
+        "    coalesce(FIRST(t3.run_as, true), FIRST(t2.run_as, true)) as run_as,\n",
+        "    SUM(is_failure) as failures,\n",
+        "    (1 - COALESCE(try_divide(SUM(is_failure), COUNT(*)), 0)) * 100 as success_ratio,\n",
+        "    first(t3.list_cost) as failure_list_cost,\n",
+        "    MAX(t1.last_seen_date) as last_seen_date\n",
+        "  FROM\n",
+        "    terminal_statues t1\n",
+        "      LEFT JOIN most_recent_jobs t2 USING (workspace_id, job_id)\n",
+        "      LEFT JOIN cost_per_status_agg t3 USING (workspace_id, job_id)\n",
+        "  GROUP BY\n",
+        "    ALL\n",
+        "  HAVING\n",
+        "    (failure_list_cost > :param_min_usage)\n",
+        "    OR (\n",
+        "      :param_include_all = 'Yes'\n",
+        "      AND failure_list_cost IS NULL\n",
+        "    )\n",
+        "  ORDER BY\n",
+        "    failures DESC\n",
+        ")\n",
+        "SELECT\n",
+        "  coalesce(\n",
+        "    CONCAT(\"<a href='\", t2.workspace_url, \"' target='_blank'>\", t2.workspace_name, \"</a>\"),\n",
+        "    t1.workspace_id\n",
+        "  ) as workspace,\n",
+        "  coalesce(\n",
+        "    CONCAT(\n",
+        "      \"<a href='\",\n",
+        "      t2.workspace_url,\n",
+        "      \"/jobs/\",\n",
+        "      t1.job_id,\n",
+        "      \"' target='_blank'>\",\n",
+        "      COALESCE(t1.name, t1.job_id),\n",
+        "      \"</a>\"\n",
+        "    )\n",
+        "  ) as entity_url,\n",
+        "  *\n",
+        "FROM\n",
+        "  output t1 LEFT JOIN system.access.workspaces_latest t2 USING (workspace_id)\n",
+        "ORDER BY\n",
+        "  failures DESC"
+      ],
+      "parameters": [
+        {
+          "displayName": "param_workspace",
+          "keyword": "param_workspace",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": "<ALL WORKSPACES>"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "param_start_date",
+          "keyword": "param_start_date",
+          "dataType": "DATE",
+          "defaultSelection": {
+            "values": {
+              "dataType": "DATE",
+              "values": [
+                {
+                  "value": "now-60d/d"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "param_end_date",
+          "keyword": "param_end_date",
+          "dataType": "DATE",
+          "defaultSelection": {
+            "values": {
+              "dataType": "DATE",
+              "values": [
+                {
+                  "value": "now/d"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "param_min_usage",
+          "keyword": "param_min_usage",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": "50"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "param_include_all",
+          "keyword": "param_include_all",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": "Yes"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "a1798302",
+      "displayName": "[Operational Observability] Most Retried Runs",
+      "queryLines": [
+        "with usage_with_cost as (\n",
+        "  SELECT\n",
+        "    t1.*,\n",
+        "    t1.identity_metadata.run_as,\n",
+        "    t1.usage_quantity * list_prices.pricing.default as list_cost\n",
+        "  FROM\n",
+        "    system.billing.usage t1\n",
+        "      INNER JOIN system.billing.list_prices list_prices\n",
+        "        on t1.cloud = list_prices.cloud\n",
+        "        and t1.sku_name = list_prices.sku_name\n",
+        "        and t1.usage_start_time >= list_prices.price_start_time\n",
+        "        and (\n",
+        "          t1.usage_end_time <= list_prices.price_end_time\n",
+        "          or list_prices.price_end_time is null\n",
+        "        )\n",
+        "  WHERE\n",
+        "    (t1.usage_date BETWEEN :param_start_date AND :param_end_date)\n",
+        "),\n",
+        "most_recent_jobs as (\n",
+        "  SELECT\n",
+        "    *,\n",
+        "    ROW_NUMBER() OVER (PARTITION BY workspace_id, job_id ORDER BY change_time DESC) as rn\n",
+        "  FROM\n",
+        "    system.lakeflow.jobs\n",
+        "  QUALIFY\n",
+        "    rn = 1\n",
+        "),\n",
+        "job_run_timeline_with_cost as (\n",
+        "  SELECT\n",
+        "    t1.*,\n",
+        "    t2.job_id,\n",
+        "    t2.run_id,\n",
+        "    t2.result_state\n",
+        "  FROM\n",
+        "    usage_with_cost t1\n",
+        "      INNER JOIN system.lakeflow.job_run_timeline t2\n",
+        "        ON t1.workspace_id = t2.workspace_id\n",
+        "        AND t1.usage_metadata.job_id = t2.job_id\n",
+        "        AND t1.usage_metadata.job_run_id = t2.run_id\n",
+        "        AND t1.usage_start_time >= date_trunc(\"Hour\", t2.period_start_time)\n",
+        "        AND t1.usage_start_time < date_trunc(\"Hour\", t2.period_end_time) + INTERVAL 1 HOUR\n",
+        "),\n",
+        "cumulative_run_status_cost as (\n",
+        "  SELECT\n",
+        "    *,\n",
+        "    SUM(list_cost) OVER (\n",
+        "        ORDER BY workspace_id, job_id, run_id, usage_end_time\n",
+        "        ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW\n",
+        "      ) AS cumulative_cost\n",
+        "  FROM\n",
+        "    job_run_timeline_with_cost\n",
+        "),\n",
+        "cost_per_status as (\n",
+        "  SELECT\n",
+        "    *,\n",
+        "    cumulative_cost\n",
+        "    - COALESCE(\n",
+        "      LAG(cumulative_cost) OVER (ORDER BY workspace_id, job_id, run_id, usage_end_time), 0\n",
+        "    ) AS result_state_cost\n",
+        "  FROM\n",
+        "    cumulative_run_status_cost\n",
+        "  WHERE\n",
+        "    result_state IS NOT NULL\n",
+        "),\n",
+        "cost_per_unsuccesful_status_agg as (\n",
+        "  SELECT\n",
+        "    workspace_id,\n",
+        "    job_id,\n",
+        "    run_id,\n",
+        "    first(run_as, TRUE) as run_as,\n",
+        "    SUM(result_state_cost) as list_cost\n",
+        "  FROM\n",
+        "    cost_per_status\n",
+        "  WHERE\n",
+        "    result_state != \"SUCCEEDED\"\n",
+        "  GROUP BY\n",
+        "    ALL\n",
+        "),\n",
+        "repaired_runs as (\n",
+        "  SELECT\n",
+        "    workspace_id,\n",
+        "    job_id,\n",
+        "    run_id,\n",
+        "    COUNT(*) as cnt\n",
+        "  FROM\n",
+        "    system.lakeflow.job_run_timeline\n",
+        "  WHERE\n",
+        "    result_state IS NOT NULL\n",
+        "  GROUP BY\n",
+        "    ALL\n",
+        "  HAVING\n",
+        "    cnt > 1\n",
+        "),\n",
+        "successful_repairs as (\n",
+        "  SELECT\n",
+        "    t1.workspace_id,\n",
+        "    t1.job_id,\n",
+        "    t1.run_id,\n",
+        "    MAX(t1.period_end_time) as period_end_time\n",
+        "  FROM\n",
+        "    system.lakeflow.job_run_timeline t1\n",
+        "      JOIN repaired_runs t2\n",
+        "        ON t1.workspace_id = t2.workspace_id\n",
+        "        AND t1.job_id = t2.job_id\n",
+        "        AND t1.run_id = t2.run_id\n",
+        "  WHERE\n",
+        "    t1.result_state = \"SUCCEEDED\"\n",
+        "  GROUP BY\n",
+        "    ALL\n",
+        "),\n",
+        "combined_repairs as (\n",
+        "  SELECT\n",
+        "    t1.*,\n",
+        "    t2.period_end_time,\n",
+        "    t1.cnt as repairs\n",
+        "  FROM\n",
+        "    repaired_runs t1 LEFT JOIN successful_repairs t2 USING (workspace_id, job_id, run_id)\n",
+        "),\n",
+        "output as (\n",
+        "  SELECT\n",
+        "    last(t3.name) as name,\n",
+        "    t1.workspace_id,\n",
+        "    t1.job_id,\n",
+        "    t1.run_id,\n",
+        "    coalesce(FIRST(t4.run_as, true), FIRST(t3.run_as, TRUE)) as run_as,\n",
+        "    first(t1.repairs) - 1 as repairs,\n",
+        "    first(t4.list_cost) as repair_list_cost,\n",
+        "    CASE\n",
+        "      WHEN\n",
+        "        t1.period_end_time IS NOT NULL\n",
+        "      THEN\n",
+        "        CAST(t1.period_end_time - MIN(t2.period_end_time) as LONG)\n",
+        "      ELSE NULL\n",
+        "    END AS repair_time_seconds\n",
+        "  FROM\n",
+        "    combined_repairs t1\n",
+        "      JOIN system.lakeflow.job_run_timeline t2 USING (workspace_id, job_id, run_id)\n",
+        "      LEFT JOIN most_recent_jobs t3 USING (workspace_id, job_id)\n",
+        "      LEFT JOIN cost_per_unsuccesful_status_agg t4 USING (workspace_id, job_id, run_id)\n",
+        "  WHERE\n",
+        "    t2.result_state IS NOT NULL\n",
+        "    AND t1.repairs > 2\n",
+        "  GROUP BY\n",
+        "    t1.workspace_id,\n",
+        "    t1.job_id,\n",
+        "    t1.run_id,\n",
+        "    t1.period_end_time\n",
+        "  HAVING\n",
+        "    (repair_list_cost > :param_min_usage)\n",
+        "    OR (\n",
+        "      :param_include_all = 'Yes'\n",
+        "      AND repair_list_cost IS NULL\n",
+        "    )\n",
+        "  ORDER BY\n",
+        "    repair_list_cost,\n",
+        "    repairs DESC\n",
+        ")\n",
+        "SELECT\n",
+        "  coalesce(\n",
+        "    CONCAT(\"<a href='\", t2.workspace_url, \"' target='_blank'>\", t2.workspace_name, \"</a>\"),\n",
+        "    t1.workspace_id\n",
+        "  ) as workspace,\n",
+        "  coalesce(\n",
+        "    CONCAT(\n",
+        "      \"<a href='\",\n",
+        "      t2.workspace_url,\n",
+        "      \"/jobs/\",\n",
+        "      t1.job_id,\n",
+        "      \"' target='_blank'>\",\n",
+        "      COALESCE(t1.name, t1.job_id),\n",
+        "      \"</a>\"\n",
+        "    )\n",
+        "  ) as entity_url,\n",
+        "  *\n",
+        "FROM\n",
+        "  output t1 LEFT JOIN system.access.workspaces_latest t2 USING (workspace_id)\n",
+        "WHERE\n",
+        "  if(:param_workspace = '<ALL WORKSPACES>', true, t2.workspace_name = :param_workspace)\n",
+        "ORDER BY\n",
+        "  repair_list_cost,\n",
+        "  repairs DESC"
+      ],
+      "parameters": [
+        {
+          "displayName": "param_start_date",
+          "keyword": "param_start_date",
+          "dataType": "DATE",
+          "defaultSelection": {
+            "values": {
+              "dataType": "DATE",
+              "values": [
+                {
+                  "value": "now-60d/d"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "param_end_date",
+          "keyword": "param_end_date",
+          "dataType": "DATE",
+          "defaultSelection": {
+            "values": {
+              "dataType": "DATE",
+              "values": [
+                {
+                  "value": "now/d"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "param_min_usage",
+          "keyword": "param_min_usage",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": "5000000"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "param_include_all",
+          "keyword": "param_include_all",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": "Yes"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "param_workspace",
+          "keyword": "param_workspace",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": "<ALL WORKSPACES>"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "5b65e781",
+      "displayName": "[Operational Observability] Job Outliers",
+      "queryLines": [
+        "-- SPENDING BROKEN DOWN BY JOB\n",
+        "with most_recent_jobs as (\n",
+        "  SELECT\n",
+        "    *,\n",
+        "    ROW_NUMBER() OVER (PARTITION BY workspace_id, job_id ORDER BY change_time DESC) as rn\n",
+        "  FROM\n",
+        "    system.lakeflow.jobs\n",
+        "  QUALIFY\n",
+        "    rn = 1\n",
+        "),\n",
+        "stats_per_job_run as (\n",
+        "  SELECT\n",
+        "    t1.workspace_id,\n",
+        "    t1.usage_metadata.job_id,\n",
+        "    t1.usage_metadata.job_run_id as run_id,\n",
+        "    FIRST(t1.identity_metadata.run_as, TRUE) as run_as,\n",
+        "    SUM(t1.usage_quantity * list_prices.pricing.default) as list_cost,\n",
+        "    first(t1.custom_tags, true) as custom_tags,\n",
+        "    MAX(t1.usage_end_time) as last_seen,\n",
+        "    MIN(t1.usage_start_time) as first_seen\n",
+        "  FROM\n",
+        "    system.billing.usage t1\n",
+        "      INNER JOIN system.billing.list_prices list_prices\n",
+        "        on t1.cloud = list_prices.cloud\n",
+        "        and t1.sku_name = list_prices.sku_name\n",
+        "        and t1.usage_start_time >= list_prices.price_start_time\n",
+        "        and (\n",
+        "          t1.usage_end_time <= list_prices.price_end_time\n",
+        "          or list_prices.price_end_time is null\n",
+        "        )\n",
+        "  WHERE\n",
+        "    t1.usage_metadata.job_id IS NOT NULL\n",
+        "    AND t1.usage_metadata.job_run_id IS NOT NULL\n",
+        "    AND (t1.usage_date BETWEEN :param_start_date AND :param_end_date)\n",
+        "  GROUP BY\n",
+        "    1,\n",
+        "    2,\n",
+        "    3\n",
+        "),\n",
+        "stats_per_job AS (\n",
+        "  SELECT\n",
+        "    t1.workspace_id,\n",
+        "    t1.job_id,\n",
+        "    coalesce(FIRST(t1.run_as, TRUE), FIRST(t2.run_as, TRUE)) as run_as,\n",
+        "    FIRST(t2.name, TRUE) as name,\n",
+        "    COUNT(run_id) AS runs,\n",
+        "    SUM(list_cost) AS total_list_cost,\n",
+        "    AVG(list_cost) AS avg_list_cost,\n",
+        "    MAX(list_cost) AS max_list_cost,\n",
+        "    percentile(list_cost, 0.9) AS p90\n",
+        "  FROM\n",
+        "    stats_per_job_run t1 LEFT JOIN most_recent_jobs t2 USING (workspace_id, job_id)\n",
+        "  WHERE\n",
+        "    first_seen > :param_start_date\n",
+        "  GROUP BY\n",
+        "    ALL\n",
+        "  ORDER BY\n",
+        "    total_list_cost DESC\n",
+        "),\n",
+        "output as (\n",
+        "  SELECT\n",
+        "    *,\n",
+        "    (max_list_cost - p90) AS list_cost_deviation_from_p90\n",
+        "  FROM\n",
+        "    stats_per_job\n",
+        "  ORDER BY\n",
+        "    list_cost_deviation_from_p90 DESC\n",
+        ")\n",
+        "SELECT\n",
+        "  coalesce(\n",
+        "    CONCAT(\"<a href='\", t2.workspace_url, \"' target='_blank'>\", t2.workspace_name, \"</a>\"),\n",
+        "    t1.workspace_id\n",
+        "  ) as workspace,\n",
+        "  coalesce(\n",
+        "    CONCAT(\n",
+        "      \"<a href='\",\n",
+        "      t2.workspace_url,\n",
+        "      \"/jobs/\",\n",
+        "      t1.job_id,\n",
+        "      \"' target='_blank'>\",\n",
+        "      COALESCE(t1.name, t1.job_id),\n",
+        "      \"</a>\"\n",
+        "    )\n",
+        "  ) as entity_url,\n",
+        "  *\n",
+        "FROM\n",
+        "  output t1 LEFT JOIN system.access.workspaces_latest t2 USING (workspace_id)\n",
+        "WHERE\n",
+        "  if(:param_workspace = '<ALL WORKSPACES>', true, t2.workspace_name = :param_workspace)"
+      ],
+      "parameters": [
+        {
+          "displayName": "param_start_date",
+          "keyword": "param_start_date",
+          "dataType": "DATE",
+          "defaultSelection": {
+            "values": {
+              "dataType": "DATE",
+              "values": [
+                {
+                  "value": "now-60d/d"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "param_end_date",
+          "keyword": "param_end_date",
+          "dataType": "DATE",
+          "defaultSelection": {
+            "values": {
+              "dataType": "DATE",
+              "values": [
+                {
+                  "value": "now/d"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "param_workspace",
+          "keyword": "param_workspace",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": "<ALL WORKSPACES>"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "6a28dc41",
+      "displayName": "[Operational Observability] Failure usage by day",
+      "queryLines": [
+        "with usage_with_cost as (\n",
+        "  SELECT\n",
+        "    t1.*,\n",
+        "    t1.identity_metadata.run_as,\n",
+        "    t1.usage_quantity * list_prices.pricing.default as list_cost\n",
+        "  FROM\n",
+        "    system.billing.usage t1\n",
+        "      INNER JOIN system.billing.list_prices list_prices\n",
+        "        on t1.cloud = list_prices.cloud\n",
+        "        and t1.sku_name = list_prices.sku_name\n",
+        "        and t1.usage_start_time >= list_prices.price_start_time\n",
+        "        and (\n",
+        "          t1.usage_end_time <= list_prices.price_end_time\n",
+        "          or list_prices.price_end_time is null\n",
+        "        )\n",
+        "  WHERE\n",
+        "    (t1.usage_date BETWEEN :param_start_date AND :param_end_date)\n",
+        "),\n",
+        "job_run_timeline_with_cost as (\n",
+        "  SELECT\n",
+        "    t1.*,\n",
+        "    t2.job_id,\n",
+        "    t2.run_id,\n",
+        "    t2.result_state\n",
+        "  FROM\n",
+        "    usage_with_cost t1\n",
+        "      INNER JOIN system.lakeflow.job_run_timeline t2\n",
+        "        ON t1.workspace_id = t2.workspace_id\n",
+        "        AND t1.usage_metadata.job_id = t2.job_id\n",
+        "        AND t1.usage_metadata.job_run_id = t2.run_id\n",
+        "        AND t1.usage_start_time >= date_trunc(\"Hour\", t2.period_start_time)\n",
+        "        AND t1.usage_start_time < date_trunc(\"Hour\", t2.period_end_time) + INTERVAL 1 HOUR\n",
+        "),\n",
+        "status_boundaries AS (\n",
+        "  SELECT\n",
+        "    workspace_id,\n",
+        "    job_id,\n",
+        "    run_id,\n",
+        "    result_state,\n",
+        "    usage_start_time,\n",
+        "    usage_end_time,\n",
+        "    LAG(usage_end_time) OVER (\n",
+        "        PARTITION BY workspace_id, job_id, run_id\n",
+        "        ORDER BY usage_start_time\n",
+        "      ) as prev_status_time\n",
+        "  FROM\n",
+        "    job_run_timeline_with_cost\n",
+        "  WHERE\n",
+        "    result_state IS NOT NULL\n",
+        "),\n",
+        "costs_by_status AS (\n",
+        "  SELECT\n",
+        "    t.workspace_id,\n",
+        "    t.job_id,\n",
+        "    t.run_id,\n",
+        "    sb.result_state,\n",
+        "    MIN(t.usage_start_time) as min_start_time,\n",
+        "    SUM(t.list_cost) as list_cost\n",
+        "  FROM\n",
+        "    job_run_timeline_with_cost t\n",
+        "      JOIN status_boundaries sb\n",
+        "        ON t.workspace_id = sb.workspace_id\n",
+        "        AND t.job_id = sb.job_id\n",
+        "        AND t.run_id = sb.run_id\n",
+        "        AND t.usage_start_time > COALESCE(sb.prev_status_time, CURRENT_DATE() - INTERVAL 999 DAYS)\n",
+        "        AND t.usage_start_time <= sb.usage_end_time\n",
+        "  GROUP BY\n",
+        "    t.workspace_id,\n",
+        "    t.job_id,\n",
+        "    t.run_id,\n",
+        "    sb.result_state\n",
+        ")\n",
+        "SELECT\n",
+        "  *\n",
+        "FROM\n",
+        "  costs_by_status t1 LEFT JOIN system.access.workspaces_latest t2 USING (workspace_id)\n",
+        "WHERE\n",
+        "  if(:param_workspace = '<ALL WORKSPACES>', true, t2.workspace_name = :param_workspace)\n",
+        "  and result_state IN ('ERROR', 'FAILED', 'TIMED_OUT');"
+      ],
+      "parameters": [
+        {
+          "displayName": "param_start_date",
+          "keyword": "param_start_date",
+          "dataType": "DATE",
+          "defaultSelection": {
+            "values": {
+              "dataType": "DATE",
+              "values": [
+                {
+                  "value": "now-60d/d"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "param_end_date",
+          "keyword": "param_end_date",
+          "dataType": "DATE",
+          "defaultSelection": {
+            "values": {
+              "dataType": "DATE",
+              "values": [
+                {
+                  "value": "now/d"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "param_workspace",
+          "keyword": "param_workspace",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": "<ALL WORKSPACES>"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "049a14ff",
+      "displayName": "[SELECT] Workspace Names",
+      "queryLines": [
+        "SELECT DISTINCT workspace_name FROM system.access.workspaces_latest ORDER BY lower(workspace_name) ASC;"
+      ]
+    }
+  ],
+  "pages": [
+    {
+      "name": "c43a692d",
+      "displayName": "Operational Observability",
+      "layout": [
+        {
+          "widget": {
+            "name": "c74f78c4",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "3b209ef5",
+                  "fields": [
+                    {
+                      "name": "workspace",
+                      "expression": "`workspace`"
+                    },
+                    {
+                      "name": "entity_url",
+                      "expression": "`entity_url`"
+                    },
+                    {
+                      "name": "run_as",
+                      "expression": "`run_as`"
+                    },
+                    {
+                      "name": "runs",
+                      "expression": "`runs`"
+                    },
+                    {
+                      "name": "failures",
+                      "expression": "`failures`"
+                    },
+                    {
+                      "name": "success_ratio",
+                      "expression": "`success_ratio`"
+                    },
+                    {
+                      "name": "failure_list_cost",
+                      "expression": "`failure_list_cost`"
+                    },
+                    {
+                      "name": "last_seen_date",
+                      "expression": "`last_seen_date`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 1,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "workspace",
+                    "booleanValues": [
+                      "false",
+                      "true"
+                    ],
+                    "imageUrlTemplate": "{{ @ }}",
+                    "imageTitleTemplate": "{{ @ }}",
+                    "imageWidth": "",
+                    "imageHeight": "",
+                    "linkUrlTemplate": "{{ @ }}",
+                    "linkTextTemplate": "{{ @ }}",
+                    "linkTitleTemplate": "{{ @ }}",
+                    "linkOpenInNewTab": true,
+                    "type": "string",
+                    "displayAs": "string",
+                    "visible": true,
+                    "order": 0,
+                    "title": "Workspace",
+                    "allowSearch": false,
+                    "alignContent": "left",
+                    "allowHTML": true,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false,
+                    "displayName": "workspace"
+                  },
+                  {
+                    "fieldName": "entity_url",
+                    "booleanValues": [
+                      "false",
+                      "true"
+                    ],
+                    "imageUrlTemplate": "{{ @ }}",
+                    "imageTitleTemplate": "{{ @ }}",
+                    "imageWidth": "",
+                    "imageHeight": "",
+                    "linkUrlTemplate": "{{ @ }}",
+                    "linkTextTemplate": "{{ @ }}",
+                    "linkTitleTemplate": "{{ @ }}",
+                    "linkOpenInNewTab": true,
+                    "type": "string",
+                    "displayAs": "string",
+                    "visible": true,
+                    "order": 1,
+                    "title": "entity_url",
+                    "allowSearch": false,
+                    "alignContent": "left",
+                    "allowHTML": true,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false,
+                    "displayName": "entity_url"
+                  },
+                  {
+                    "fieldName": "run_as",
+                    "booleanValues": [
+                      "false",
+                      "true"
+                    ],
+                    "imageUrlTemplate": "{{ @ }}",
+                    "imageTitleTemplate": "{{ @ }}",
+                    "imageWidth": "",
+                    "imageHeight": "",
+                    "linkUrlTemplate": "{{ @ }}",
+                    "linkTextTemplate": "{{ @ }}",
+                    "linkTitleTemplate": "{{ @ }}",
+                    "linkOpenInNewTab": true,
+                    "type": "string",
+                    "displayAs": "string",
+                    "visible": true,
+                    "order": 5,
+                    "title": "run_as",
+                    "allowSearch": false,
+                    "alignContent": "left",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false,
+                    "displayName": "run_as"
+                  },
+                  {
+                    "fieldName": "runs",
+                    "numberFormat": "0",
+                    "booleanValues": [
+                      "false",
+                      "true"
+                    ],
+                    "imageUrlTemplate": "{{ @ }}",
+                    "imageTitleTemplate": "{{ @ }}",
+                    "imageWidth": "",
+                    "imageHeight": "",
+                    "linkUrlTemplate": "{{ @ }}",
+                    "linkTextTemplate": "{{ @ }}",
+                    "linkTitleTemplate": "{{ @ }}",
+                    "linkOpenInNewTab": true,
+                    "type": "integer",
+                    "displayAs": "number",
+                    "visible": true,
+                    "order": 6,
+                    "title": "runs",
+                    "allowSearch": false,
+                    "alignContent": "right",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false,
+                    "displayName": "runs"
+                  },
+                  {
+                    "fieldName": "failures",
+                    "numberFormat": "0",
+                    "booleanValues": [
+                      "false",
+                      "true"
+                    ],
+                    "imageUrlTemplate": "{{ @ }}",
+                    "imageTitleTemplate": "{{ @ }}",
+                    "imageWidth": "",
+                    "imageHeight": "",
+                    "linkUrlTemplate": "{{ @ }}",
+                    "linkTextTemplate": "{{ @ }}",
+                    "linkTitleTemplate": "{{ @ }}",
+                    "linkOpenInNewTab": true,
+                    "type": "integer",
+                    "displayAs": "number",
+                    "visible": true,
+                    "order": 7,
+                    "title": "failures",
+                    "allowSearch": false,
+                    "alignContent": "right",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false,
+                    "displayName": "failures"
+                  },
+                  {
+                    "fieldName": "success_ratio",
+                    "numberFormat": "0.00%",
+                    "booleanValues": [
+                      "false",
+                      "true"
+                    ],
+                    "imageUrlTemplate": "{{ @ }}",
+                    "imageTitleTemplate": "{{ @ }}",
+                    "imageWidth": "",
+                    "imageHeight": "",
+                    "linkUrlTemplate": "{{ @ }}",
+                    "linkTextTemplate": "{{ @ }}",
+                    "linkTitleTemplate": "{{ @ }}",
+                    "linkOpenInNewTab": true,
+                    "type": "float",
+                    "displayAs": "number",
+                    "visible": true,
+                    "order": 8,
+                    "title": "success_ratio",
+                    "allowSearch": false,
+                    "alignContent": "right",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false,
+                    "description": "",
+                    "cellFormat": {
+                      "default": {
+                        "foregroundColor": null
+                      },
+                      "rules": [
+                        {
+                          "if": {
+                            "column": "success_ratio",
+                            "fn": "<",
+                            "literal": "0.95"
+                          },
+                          "value": {
+                            "foregroundColor": "#E92828"
+                          }
+                        }
+                      ]
+                    },
+                    "displayName": "success_ratio"
+                  },
+                  {
+                    "fieldName": "failure_list_cost",
+                    "numberFormat": "$0.00",
+                    "booleanValues": [
+                      "false",
+                      "true"
+                    ],
+                    "imageUrlTemplate": "{{ @ }}",
+                    "imageTitleTemplate": "{{ @ }}",
+                    "imageWidth": "",
+                    "imageHeight": "",
+                    "linkUrlTemplate": "{{ @ }}",
+                    "linkTextTemplate": "{{ @ }}",
+                    "linkTitleTemplate": "{{ @ }}",
+                    "linkOpenInNewTab": true,
+                    "type": "decimal",
+                    "displayAs": "number",
+                    "visible": true,
+                    "order": 9,
+                    "title": "failure usage (USD)",
+                    "allowSearch": false,
+                    "alignContent": "right",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false,
+                    "displayName": "failure_list_cost"
+                  },
+                  {
+                    "fieldName": "last_seen_date",
+                    "dateTimeFormat": "YYYY-MM-DD",
+                    "booleanValues": [
+                      "false",
+                      "true"
+                    ],
+                    "imageUrlTemplate": "{{ @ }}",
+                    "imageTitleTemplate": "{{ @ }}",
+                    "imageWidth": "",
+                    "imageHeight": "",
+                    "linkUrlTemplate": "{{ @ }}",
+                    "linkTextTemplate": "{{ @ }}",
+                    "linkTitleTemplate": "{{ @ }}",
+                    "linkOpenInNewTab": true,
+                    "type": "datetime",
+                    "displayAs": "datetime",
+                    "visible": true,
+                    "order": 10,
+                    "title": "last_seen",
+                    "allowSearch": false,
+                    "alignContent": "right",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false,
+                    "displayName": "last_seen_date"
+                  }
+                ]
+              },
+              "invisibleColumns": [
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "workspace_id",
+                  "type": "string",
+                  "displayAs": "string",
+                  "order": 2,
+                  "title": "workspace_id",
+                  "allowSearch": false,
+                  "alignContent": "left",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "job_id",
+                  "type": "string",
+                  "displayAs": "string",
+                  "order": 3,
+                  "title": "job_id",
+                  "allowSearch": false,
+                  "alignContent": "left",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "name",
+                  "type": "string",
+                  "displayAs": "string",
+                  "order": 4,
+                  "title": "name",
+                  "allowSearch": false,
+                  "alignContent": "left",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "account_id",
+                  "type": "string",
+                  "displayAs": "string",
+                  "order": 11,
+                  "title": "account_id",
+                  "allowSearch": false,
+                  "alignContent": "left",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "aws_region",
+                  "type": "string",
+                  "displayAs": "string",
+                  "order": 12,
+                  "title": "aws_region",
+                  "allowSearch": false,
+                  "alignContent": "left",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "azure_workspace_info",
+                  "type": "string",
+                  "displayAs": "string",
+                  "order": 13,
+                  "title": "azure_workspace_info",
+                  "allowSearch": false,
+                  "alignContent": "left",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "cloud",
+                  "type": "string",
+                  "displayAs": "string",
+                  "order": 14,
+                  "title": "cloud",
+                  "allowSearch": false,
+                  "alignContent": "left",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "cloud_resource_container",
+                  "type": "string",
+                  "displayAs": "string",
+                  "order": 15,
+                  "title": "cloud_resource_container",
+                  "allowSearch": false,
+                  "alignContent": "left",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "numberFormat": "0",
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "creation_time",
+                  "type": "integer",
+                  "displayAs": "number",
+                  "order": 16,
+                  "title": "creation_time",
+                  "allowSearch": false,
+                  "alignContent": "right",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "credentials_id",
+                  "type": "string",
+                  "displayAs": "string",
+                  "order": 17,
+                  "title": "credentials_id",
+                  "allowSearch": false,
+                  "alignContent": "left",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "deployment_name",
+                  "type": "string",
+                  "displayAs": "string",
+                  "order": 18,
+                  "title": "deployment_name",
+                  "allowSearch": false,
+                  "alignContent": "left",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "location",
+                  "type": "string",
+                  "displayAs": "string",
+                  "order": 19,
+                  "title": "location",
+                  "allowSearch": false,
+                  "alignContent": "left",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "managed_services_customer_managed_key_id",
+                  "type": "string",
+                  "displayAs": "string",
+                  "order": 20,
+                  "title": "managed_services_customer_managed_key_id",
+                  "allowSearch": false,
+                  "alignContent": "left",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "network_id",
+                  "type": "string",
+                  "displayAs": "string",
+                  "order": 21,
+                  "title": "network_id",
+                  "allowSearch": false,
+                  "alignContent": "left",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "pricing_tier",
+                  "type": "string",
+                  "displayAs": "string",
+                  "order": 22,
+                  "title": "pricing_tier",
+                  "allowSearch": false,
+                  "alignContent": "left",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "private_access_settings_id",
+                  "type": "string",
+                  "displayAs": "string",
+                  "order": 23,
+                  "title": "private_access_settings_id",
+                  "allowSearch": false,
+                  "alignContent": "left",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "storage_configuration_id",
+                  "type": "string",
+                  "displayAs": "string",
+                  "order": 24,
+                  "title": "storage_configuration_id",
+                  "allowSearch": false,
+                  "alignContent": "left",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "storage_customer_managed_key_id",
+                  "type": "string",
+                  "displayAs": "string",
+                  "order": 25,
+                  "title": "storage_customer_managed_key_id",
+                  "allowSearch": false,
+                  "alignContent": "left",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "workspace_name",
+                  "type": "string",
+                  "displayAs": "string",
+                  "order": 26,
+                  "title": "workspace_name",
+                  "allowSearch": false,
+                  "alignContent": "left",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "workspace_status",
+                  "type": "string",
+                  "displayAs": "string",
+                  "order": 27,
+                  "title": "workspace_status",
+                  "allowSearch": false,
+                  "alignContent": "left",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "workspace_status_message",
+                  "type": "string",
+                  "displayAs": "string",
+                  "order": 28,
+                  "title": "workspace_status_message",
+                  "allowSearch": false,
+                  "alignContent": "left",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                }
+              ],
+              "allowHTMLByDefault": false,
+              "itemsPerPage": 25,
+              "paginationSize": "default",
+              "condensed": false,
+              "withRowNumber": false,
+              "frame": {
+                "showTitle": true,
+                "title": "Highest Failure Jobs "
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 11,
+            "width": 6,
+            "height": 10
+          }
+        },
+        {
+          "widget": {
+            "name": "07907825",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "a1798302",
+                  "fields": [
+                    {
+                      "name": "workspace",
+                      "expression": "`workspace`"
+                    },
+                    {
+                      "name": "entity_url",
+                      "expression": "`entity_url`"
+                    },
+                    {
+                      "name": "run_id",
+                      "expression": "`run_id`"
+                    },
+                    {
+                      "name": "run_as",
+                      "expression": "`run_as`"
+                    },
+                    {
+                      "name": "repairs",
+                      "expression": "`repairs`"
+                    },
+                    {
+                      "name": "repair_list_cost",
+                      "expression": "`repair_list_cost`"
+                    },
+                    {
+                      "name": "repair_time_seconds",
+                      "expression": "`repair_time_seconds`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 1,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "workspace",
+                    "booleanValues": [
+                      "false",
+                      "true"
+                    ],
+                    "imageUrlTemplate": "{{ @ }}",
+                    "imageTitleTemplate": "{{ @ }}",
+                    "imageWidth": "",
+                    "imageHeight": "",
+                    "linkUrlTemplate": "{{ @ }}",
+                    "linkTextTemplate": "{{ @ }}",
+                    "linkTitleTemplate": "{{ @ }}",
+                    "linkOpenInNewTab": true,
+                    "type": "string",
+                    "displayAs": "string",
+                    "visible": true,
+                    "order": 0,
+                    "title": "Workspace",
+                    "allowSearch": false,
+                    "alignContent": "left",
+                    "allowHTML": true,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false,
+                    "displayName": "workspace"
+                  },
+                  {
+                    "fieldName": "entity_url",
+                    "booleanValues": [
+                      "false",
+                      "true"
+                    ],
+                    "imageUrlTemplate": "{{ @ }}",
+                    "imageTitleTemplate": "{{ @ }}",
+                    "imageWidth": "",
+                    "imageHeight": "",
+                    "linkUrlTemplate": "{{ @ }}",
+                    "linkTextTemplate": "{{ @ }}",
+                    "linkTitleTemplate": "{{ @ }}",
+                    "linkOpenInNewTab": true,
+                    "type": "string",
+                    "displayAs": "string",
+                    "visible": true,
+                    "order": 4,
+                    "title": "entity_url",
+                    "allowSearch": false,
+                    "alignContent": "left",
+                    "allowHTML": true,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false,
+                    "displayName": "entity_url"
+                  },
+                  {
+                    "fieldName": "run_id",
+                    "booleanValues": [
+                      "false",
+                      "true"
+                    ],
+                    "imageUrlTemplate": "{{ @ }}",
+                    "imageTitleTemplate": "{{ @ }}",
+                    "imageWidth": "",
+                    "imageHeight": "",
+                    "linkUrlTemplate": "{{ @ }}",
+                    "linkTextTemplate": "{{ @ }}",
+                    "linkTitleTemplate": "{{ @ }}",
+                    "linkOpenInNewTab": true,
+                    "type": "string",
+                    "displayAs": "string",
+                    "visible": true,
+                    "order": 5,
+                    "title": "run_id",
+                    "allowSearch": false,
+                    "alignContent": "left",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false,
+                    "displayName": "run_id"
+                  },
+                  {
+                    "fieldName": "run_as",
+                    "booleanValues": [
+                      "false",
+                      "true"
+                    ],
+                    "imageUrlTemplate": "{{ @ }}",
+                    "imageTitleTemplate": "{{ @ }}",
+                    "imageWidth": "",
+                    "imageHeight": "",
+                    "linkUrlTemplate": "{{ @ }}",
+                    "linkTextTemplate": "{{ @ }}",
+                    "linkTitleTemplate": "{{ @ }}",
+                    "linkOpenInNewTab": true,
+                    "type": "string",
+                    "displayAs": "string",
+                    "visible": true,
+                    "order": 6,
+                    "title": "run_as",
+                    "allowSearch": false,
+                    "alignContent": "left",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false,
+                    "displayName": "run_as"
+                  },
+                  {
+                    "fieldName": "repairs",
+                    "numberFormat": "0",
+                    "booleanValues": [
+                      "false",
+                      "true"
+                    ],
+                    "imageUrlTemplate": "{{ @ }}",
+                    "imageTitleTemplate": "{{ @ }}",
+                    "imageWidth": "",
+                    "imageHeight": "",
+                    "linkUrlTemplate": "{{ @ }}",
+                    "linkTextTemplate": "{{ @ }}",
+                    "linkTitleTemplate": "{{ @ }}",
+                    "linkOpenInNewTab": true,
+                    "type": "integer",
+                    "displayAs": "number",
+                    "visible": true,
+                    "order": 7,
+                    "title": "repairs",
+                    "allowSearch": false,
+                    "alignContent": "right",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false,
+                    "displayName": "repairs"
+                  },
+                  {
+                    "fieldName": "repair_list_cost",
+                    "numberFormat": "$0.00",
+                    "booleanValues": [
+                      "false",
+                      "true"
+                    ],
+                    "imageUrlTemplate": "{{ @ }}",
+                    "imageTitleTemplate": "{{ @ }}",
+                    "imageWidth": "",
+                    "imageHeight": "",
+                    "linkUrlTemplate": "{{ @ }}",
+                    "linkTextTemplate": "{{ @ }}",
+                    "linkTitleTemplate": "{{ @ }}",
+                    "linkOpenInNewTab": true,
+                    "type": "decimal",
+                    "displayAs": "number",
+                    "visible": true,
+                    "order": 8,
+                    "title": "repair usage (USD)",
+                    "allowSearch": false,
+                    "alignContent": "right",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false,
+                    "displayName": "repair_list_cost"
+                  },
+                  {
+                    "fieldName": "repair_time_seconds",
+                    "numberFormat": "0",
+                    "booleanValues": [
+                      "false",
+                      "true"
+                    ],
+                    "imageUrlTemplate": "{{ @ }}",
+                    "imageTitleTemplate": "{{ @ }}",
+                    "imageWidth": "",
+                    "imageHeight": "",
+                    "linkUrlTemplate": "{{ @ }}",
+                    "linkTextTemplate": "{{ @ }}",
+                    "linkTitleTemplate": "{{ @ }}",
+                    "linkOpenInNewTab": true,
+                    "type": "integer",
+                    "displayAs": "number",
+                    "visible": true,
+                    "order": 9,
+                    "title": "repair_time_seconds",
+                    "allowSearch": false,
+                    "alignContent": "right",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false,
+                    "displayName": "repair_time_seconds"
+                  }
+                ]
+              },
+              "invisibleColumns": [
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "workspace_id",
+                  "type": "string",
+                  "displayAs": "string",
+                  "order": 1,
+                  "title": "workspace_id",
+                  "allowSearch": false,
+                  "alignContent": "left",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "job_id",
+                  "type": "string",
+                  "displayAs": "string",
+                  "order": 2,
+                  "title": "job_id",
+                  "allowSearch": false,
+                  "alignContent": "left",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "name",
+                  "type": "string",
+                  "displayAs": "string",
+                  "order": 3,
+                  "title": "name",
+                  "allowSearch": false,
+                  "alignContent": "left",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "account_id",
+                  "type": "string",
+                  "displayAs": "string",
+                  "order": 10,
+                  "title": "account_id",
+                  "allowSearch": false,
+                  "alignContent": "left",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "workspace_name",
+                  "type": "string",
+                  "displayAs": "string",
+                  "order": 11,
+                  "title": "workspace_name",
+                  "allowSearch": false,
+                  "alignContent": "left",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "workspace_url",
+                  "type": "string",
+                  "displayAs": "string",
+                  "order": 12,
+                  "title": "workspace_url",
+                  "allowSearch": false,
+                  "alignContent": "left",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "dateTimeFormat": "DD/MM/YYYY HH:mm:ss.SSS",
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "create_time",
+                  "type": "datetime",
+                  "displayAs": "datetime",
+                  "order": 13,
+                  "title": "create_time",
+                  "allowSearch": false,
+                  "alignContent": "right",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "status",
+                  "type": "string",
+                  "displayAs": "string",
+                  "order": 14,
+                  "title": "status",
+                  "allowSearch": false,
+                  "alignContent": "left",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                }
+              ],
+              "allowHTMLByDefault": false,
+              "itemsPerPage": 25,
+              "paginationSize": "default",
+              "condensed": false,
+              "withRowNumber": false,
+              "frame": {
+                "showTitle": true,
+                "title": "Most Retried Runs "
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 21,
+            "width": 6,
+            "height": 9
+          }
+        },
+        {
+          "widget": {
+            "name": "101e4f30",
+            "queries": [
+              {
+                "name": "parameter_dashboards/01efac9216a11fffa3ae326cef9a1360/datasets/01efadbd9b9c1bd4b07b83761128abea_param_start_date",
+                "query": {
+                  "datasetName": "3b209ef5",
+                  "parameters": [
+                    {
+                      "name": "param_start_date",
+                      "keyword": "param_start_date"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_dashboards/01efac9216a11fffa3ae326cef9a1360/datasets/01efadbfdc861273b4e02651c8f01a9f_param_start_date",
+                "query": {
+                  "datasetName": "a1798302",
+                  "parameters": [
+                    {
+                      "name": "param_start_date",
+                      "keyword": "param_start_date"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_dashboards/01efac9216a11fffa3ae326cef9a1360/datasets/01efadc467c81e708b6f31e3b62d65d6_param_start_date",
+                "query": {
+                  "datasetName": "5b65e781",
+                  "parameters": [
+                    {
+                      "name": "param_start_date",
+                      "keyword": "param_start_date"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_dashboards/01efac9216a11fffa3ae326cef9a1360/datasets/01efadc4f07e104091a94c5f0a102d9a_param_start_date",
+                "query": {
+                  "datasetName": "6a28dc41",
+                  "parameters": [
+                    {
+                      "name": "param_start_date",
+                      "keyword": "param_start_date"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-date-picker",
+              "encodings": {
+                "fields": [
+                  {
+                    "parameterName": "param_start_date",
+                    "queryName": "parameter_dashboards/01efac9216a11fffa3ae326cef9a1360/datasets/01efadbd9b9c1bd4b07b83761128abea_param_start_date"
+                  },
+                  {
+                    "parameterName": "param_start_date",
+                    "queryName": "parameter_dashboards/01efac9216a11fffa3ae326cef9a1360/datasets/01efadbfdc861273b4e02651c8f01a9f_param_start_date"
+                  },
+                  {
+                    "parameterName": "param_start_date",
+                    "queryName": "parameter_dashboards/01efac9216a11fffa3ae326cef9a1360/datasets/01efadc467c81e708b6f31e3b62d65d6_param_start_date"
+                  },
+                  {
+                    "parameterName": "param_start_date",
+                    "queryName": "parameter_dashboards/01efac9216a11fffa3ae326cef9a1360/datasets/01efadc4f07e104091a94c5f0a102d9a_param_start_date"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Start date"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 2,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "1bd6c63e",
+            "queries": [
+              {
+                "name": "parameter_dashboards/01efac9216a11fffa3ae326cef9a1360/datasets/01efadbd9b9c1bd4b07b83761128abea_param_end_date",
+                "query": {
+                  "datasetName": "3b209ef5",
+                  "parameters": [
+                    {
+                      "name": "param_end_date",
+                      "keyword": "param_end_date"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_dashboards/01efac9216a11fffa3ae326cef9a1360/datasets/01efadbfdc861273b4e02651c8f01a9f_param_end_date",
+                "query": {
+                  "datasetName": "a1798302",
+                  "parameters": [
+                    {
+                      "name": "param_end_date",
+                      "keyword": "param_end_date"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_dashboards/01efac9216a11fffa3ae326cef9a1360/datasets/01efadc467c81e708b6f31e3b62d65d6_param_end_date",
+                "query": {
+                  "datasetName": "5b65e781",
+                  "parameters": [
+                    {
+                      "name": "param_end_date",
+                      "keyword": "param_end_date"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_dashboards/01efac9216a11fffa3ae326cef9a1360/datasets/01efadc4f07e104091a94c5f0a102d9a_param_end_date",
+                "query": {
+                  "datasetName": "6a28dc41",
+                  "parameters": [
+                    {
+                      "name": "param_end_date",
+                      "keyword": "param_end_date"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-date-picker",
+              "encodings": {
+                "fields": [
+                  {
+                    "parameterName": "param_end_date",
+                    "queryName": "parameter_dashboards/01efac9216a11fffa3ae326cef9a1360/datasets/01efadbd9b9c1bd4b07b83761128abea_param_end_date"
+                  },
+                  {
+                    "parameterName": "param_end_date",
+                    "queryName": "parameter_dashboards/01efac9216a11fffa3ae326cef9a1360/datasets/01efadbfdc861273b4e02651c8f01a9f_param_end_date"
+                  },
+                  {
+                    "parameterName": "param_end_date",
+                    "queryName": "parameter_dashboards/01efac9216a11fffa3ae326cef9a1360/datasets/01efadc467c81e708b6f31e3b62d65d6_param_end_date"
+                  },
+                  {
+                    "parameterName": "param_end_date",
+                    "queryName": "parameter_dashboards/01efac9216a11fffa3ae326cef9a1360/datasets/01efadc4f07e104091a94c5f0a102d9a_param_end_date"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "End date"
+              }
+            }
+          },
+          "position": {
+            "x": 2,
+            "y": 0,
+            "width": 2,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "df24ffe5",
+            "queries": [
+              {
+                "name": "dashboards/01efac9216a11fffa3ae326cef9a1360/datasets/01f0673fb52a1570882e205c386e46ec_workspace_name",
+                "query": {
+                  "datasetName": "049a14ff",
+                  "fields": [
+                    {
+                      "name": "workspace_name",
+                      "expression": "`workspace_name`"
+                    },
+                    {
+                      "name": "workspace_name_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_dashboards/01efac9216a11fffa3ae326cef9a1360/datasets/01f01345463d1e1d92583d01796b0a4e_param_workspace",
+                "query": {
+                  "datasetName": "3b209ef5",
+                  "parameters": [
+                    {
+                      "name": "param_workspace",
+                      "keyword": "param_workspace"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_dashboards/01efac9216a11fffa3ae326cef9a1360/datasets/01f01345463d1e30ba6ea775d682efed_param_workspace",
+                "query": {
+                  "datasetName": "a1798302",
+                  "parameters": [
+                    {
+                      "name": "param_workspace",
+                      "keyword": "param_workspace"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_dashboards/01efac9216a11fffa3ae326cef9a1360/datasets/01f01345463d1e42b8a46852250a3183_param_workspace",
+                "query": {
+                  "datasetName": "5b65e781",
+                  "parameters": [
+                    {
+                      "name": "param_workspace",
+                      "keyword": "param_workspace"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-single-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "parameterName": "param_workspace",
+                    "queryName": "parameter_dashboards/01efac9216a11fffa3ae326cef9a1360/datasets/01f01345463d1e1d92583d01796b0a4e_param_workspace"
+                  },
+                  {
+                    "parameterName": "param_workspace",
+                    "queryName": "parameter_dashboards/01efac9216a11fffa3ae326cef9a1360/datasets/01f01345463d1e30ba6ea775d682efed_param_workspace"
+                  },
+                  {
+                    "parameterName": "param_workspace",
+                    "queryName": "parameter_dashboards/01efac9216a11fffa3ae326cef9a1360/datasets/01f01345463d1e42b8a46852250a3183_param_workspace"
+                  },
+                  {
+                    "fieldName": "workspace_name",
+                    "displayName": "workspace_name",
+                    "queryName": "dashboards/01efac9216a11fffa3ae326cef9a1360/datasets/01f0673fb52a1570882e205c386e46ec_workspace_name"
+                  }
+                ]
+              },
+              "selection": {
+                "defaultSelection": {
+                  "values": {
+                    "dataType": "STRING",
+                    "values": [
+                      {
+                        "value": "<ALL WORKSPACES>"
+                      }
+                    ]
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Workspace"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 0,
+            "width": 2,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "e1e40b71",
+            "queries": [
+              {
+                "name": "parameter_dashboards/01efac9216a11fffa3ae326cef9a1360/datasets/01efadbd9b9c1bd4b07b83761128abea_param_min_usage",
+                "query": {
+                  "datasetName": "3b209ef5",
+                  "parameters": [
+                    {
+                      "name": "param_min_usage",
+                      "keyword": "param_min_usage"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_dashboards/01efac9216a11fffa3ae326cef9a1360/datasets/01efadbfdc861273b4e02651c8f01a9f_param_min_usage",
+                "query": {
+                  "datasetName": "a1798302",
+                  "parameters": [
+                    {
+                      "name": "param_min_usage",
+                      "keyword": "param_min_usage"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-single-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "parameterName": "param_min_usage",
+                    "queryName": "parameter_dashboards/01efac9216a11fffa3ae326cef9a1360/datasets/01efadbd9b9c1bd4b07b83761128abea_param_min_usage"
+                  },
+                  {
+                    "parameterName": "param_min_usage",
+                    "queryName": "parameter_dashboards/01efac9216a11fffa3ae326cef9a1360/datasets/01efadbfdc861273b4e02651c8f01a9f_param_min_usage"
+                  }
+                ]
+              },
+              "selection": {
+                "defaultSelection": {
+                  "values": {
+                    "dataType": "STRING",
+                    "values": [
+                      {
+                        "value": "100"
+                      }
+                    ]
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Cost (USD)",
+                "showDescription": true,
+                "description": "Minimum cost of wasted usage to include in visualizations "
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 1,
+            "width": 2,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "57e4f3af",
+            "queries": [
+              {
+                "name": "dashboards/01efac9216a11fffa3ae326cef9a1360/datasets/01efac9216a213e9a329193622e33eb1_include_all_clusters",
+                "query": {
+                  "datasetName": "c980521d",
+                  "fields": [
+                    {
+                      "name": "include_all_clusters",
+                      "expression": "`include_all_clusters`"
+                    },
+                    {
+                      "name": "include_all_clusters_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_dashboards/01efac9216a11fffa3ae326cef9a1360/datasets/01efadbd9b9c1bd4b07b83761128abea_param_include_all",
+                "query": {
+                  "datasetName": "3b209ef5",
+                  "parameters": [
+                    {
+                      "name": "param_include_all",
+                      "keyword": "param_include_all"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_dashboards/01efac9216a11fffa3ae326cef9a1360/datasets/01efadbfdc861273b4e02651c8f01a9f_param_include_all",
+                "query": {
+                  "datasetName": "a1798302",
+                  "parameters": [
+                    {
+                      "name": "param_include_all",
+                      "keyword": "param_include_all"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-single-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "include_all_clusters",
+                    "displayName": "include_all_clusters",
+                    "queryName": "dashboards/01efac9216a11fffa3ae326cef9a1360/datasets/01efac9216a213e9a329193622e33eb1_include_all_clusters"
+                  },
+                  {
+                    "parameterName": "param_include_all",
+                    "queryName": "parameter_dashboards/01efac9216a11fffa3ae326cef9a1360/datasets/01efadbd9b9c1bd4b07b83761128abea_param_include_all"
+                  },
+                  {
+                    "parameterName": "param_include_all",
+                    "queryName": "parameter_dashboards/01efac9216a11fffa3ae326cef9a1360/datasets/01efadbfdc861273b4e02651c8f01a9f_param_include_all"
+                  }
+                ]
+              },
+              "selection": {
+                "defaultSelection": {
+                  "values": {
+                    "dataType": "STRING",
+                    "values": [
+                      {
+                        "value": "Yes"
+                      }
+                    ]
+                  }
+                }
+              },
+              "disallowAll": true,
+              "frame": {
+                "showTitle": true,
+                "title": "Include NULL usage",
+                "showDescription": true,
+                "description": "We can calculate the usage only for jobs running on job clusters/serverless. Shall we include job runs on other clusters?"
+              }
+            }
+          },
+          "position": {
+            "x": 2,
+            "y": 1,
+            "width": 2,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "a7bef6c6",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "6a28dc41",
+                  "fields": [
+                    {
+                      "name": "result_state",
+                      "expression": "`result_state`"
+                    },
+                    {
+                      "name": "daily(min_start_time)",
+                      "expression": "DATE_TRUNC(\"DAY\", `min_start_time`)"
+                    },
+                    {
+                      "name": "sum(list_cost)",
+                      "expression": "SUM(`list_cost`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "daily(min_start_time)",
+                  "scale": {
+                    "type": "temporal"
+                  },
+                  "axis": {
+                    "hideTitle": true
+                  },
+                  "displayName": "min_start_time"
+                },
+                "y": {
+                  "fieldName": "sum(list_cost)",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "axis": {
+                    "title": "usage (USD)"
+                  },
+                  "displayName": "usage (USD)"
+                },
+                "color": {
+                  "fieldName": "result_state",
+                  "scale": {
+                    "type": "categorical",
+                    "mappings": [
+                      {
+                        "value": "ERROR",
+                        "color": "#FF3621"
+                      },
+                      {
+                        "value": "FAILED",
+                        "color": "#FCA4A1"
+                      },
+                      {
+                        "value": "TIMED_OUT",
+                        "color": "#919191"
+                      }
+                    ]
+                  },
+                  "displayName": "result_state"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Daily Spend on Unsuccessful Job Runs"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 3,
+            "width": 6,
+            "height": 8
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS"
+    },
+    {
+      "name": "400c64ef",
+      "displayName": "Job runs",
+      "layout": [
+        {
+          "widget": {
+            "name": "5e0bbce6",
+            "queries": [
+              {
+                "name": "parameter_dashboards/01efac9216a11fffa3ae326cef9a1360/datasets/01eface1546f1957b208a0111252518e_param_start_date",
+                "query": {
+                  "datasetName": "f5da4429",
+                  "parameters": [
+                    {
+                      "name": "param_start_date",
+                      "keyword": "param_start_date"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-date-picker",
+              "encodings": {
+                "fields": [
+                  {
+                    "parameterName": "param_start_date",
+                    "queryName": "parameter_dashboards/01efac9216a11fffa3ae326cef9a1360/datasets/01efacb54881120cb47ceb5dd41a7344_param_start_date"
+                  },
+                  {
+                    "parameterName": "param_start_date",
+                    "queryName": "parameter_dashboards/01efac9216a11fffa3ae326cef9a1360/datasets/01efacba488b1dcfaec54f03c6545c62_param_start_date"
+                  },
+                  {
+                    "parameterName": "param_start_date",
+                    "queryName": "parameter_dashboards/01efac9216a11fffa3ae326cef9a1360/datasets/01efacbddc661d83b9077062f1660323_param_start_date"
+                  },
+                  {
+                    "parameterName": "param_start_date",
+                    "queryName": "parameter_dashboards/01efac9216a11fffa3ae326cef9a1360/datasets/01efacc098471ec6aa5bc0cc70b32298_param_start_date"
+                  },
+                  {
+                    "parameterName": "param_start_date",
+                    "queryName": "parameter_dashboards/01efac9216a11fffa3ae326cef9a1360/datasets/01efacdac1171fc39599215f42dc4c17_param_start_date"
+                  },
+                  {
+                    "parameterName": "param_start_date",
+                    "queryName": "parameter_dashboards/01efac9216a11fffa3ae326cef9a1360/datasets/01eface1546f1957b208a0111252518e_param_start_date"
+                  },
+                  {
+                    "parameterName": "param_start_date",
+                    "queryName": "parameter_dashboards/01efac9216a11fffa3ae326cef9a1360/datasets/01eface26b1c1a25a38e27ebfda9dcc8_param_start_date"
+                  },
+                  {
+                    "parameterName": "param_start_date",
+                    "queryName": "parameter_dashboards/01efac9216a11fffa3ae326cef9a1360/datasets/01efad92f47418aa827eeb73a0090aa6_param_start_date"
+                  },
+                  {
+                    "parameterName": "param_start_date",
+                    "queryName": "parameter_dashboards/01efac9216a11fffa3ae326cef9a1360/datasets/01efadafc390108e94922cd7f320ce4e_param_start_date"
+                  }
+                ]
+              },
+              "selection": {
+                "defaultSelection": {
+                  "values": {
+                    "dataType": "DATE",
+                    "values": [
+                      {
+                        "value": "now-60d/d"
+                      }
+                    ]
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Start date"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 2,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "54eb21f3",
+            "queries": [
+              {
+                "name": "parameter_dashboards/01efac9216a11fffa3ae326cef9a1360/datasets/01eface1546f1957b208a0111252518e_param_end_date",
+                "query": {
+                  "datasetName": "f5da4429",
+                  "parameters": [
+                    {
+                      "name": "param_end_date",
+                      "keyword": "param_end_date"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-date-picker",
+              "encodings": {
+                "fields": [
+                  {
+                    "parameterName": "param_end_date",
+                    "queryName": "parameter_dashboards/01efac9216a11fffa3ae326cef9a1360/datasets/01efacb54881120cb47ceb5dd41a7344_param_end_date"
+                  },
+                  {
+                    "parameterName": "param_end_date",
+                    "queryName": "parameter_dashboards/01efac9216a11fffa3ae326cef9a1360/datasets/01efacba488b1dcfaec54f03c6545c62_param_end_date"
+                  },
+                  {
+                    "parameterName": "param_end_date",
+                    "queryName": "parameter_dashboards/01efac9216a11fffa3ae326cef9a1360/datasets/01efacbddc661d83b9077062f1660323_param_end_date"
+                  },
+                  {
+                    "parameterName": "param_end_date",
+                    "queryName": "parameter_dashboards/01efac9216a11fffa3ae326cef9a1360/datasets/01efacc098471ec6aa5bc0cc70b32298_param_end_date"
+                  },
+                  {
+                    "parameterName": "param_end_date",
+                    "queryName": "parameter_dashboards/01efac9216a11fffa3ae326cef9a1360/datasets/01efacdac1171fc39599215f42dc4c17_param_end_date"
+                  },
+                  {
+                    "parameterName": "param_end_date",
+                    "queryName": "parameter_dashboards/01efac9216a11fffa3ae326cef9a1360/datasets/01eface1546f1957b208a0111252518e_param_end_date"
+                  },
+                  {
+                    "parameterName": "param_end_date",
+                    "queryName": "parameter_dashboards/01efac9216a11fffa3ae326cef9a1360/datasets/01eface26b1c1a25a38e27ebfda9dcc8_param_end_date"
+                  },
+                  {
+                    "parameterName": "param_end_date",
+                    "queryName": "parameter_dashboards/01efac9216a11fffa3ae326cef9a1360/datasets/01efad92f47418aa827eeb73a0090aa6_param_end_date"
+                  },
+                  {
+                    "parameterName": "param_end_date",
+                    "queryName": "parameter_dashboards/01efac9216a11fffa3ae326cef9a1360/datasets/01efadafc390108e94922cd7f320ce4e_param_end_date"
+                  }
+                ]
+              },
+              "selection": {
+                "defaultSelection": {
+                  "values": {
+                    "dataType": "DATE",
+                    "values": [
+                      {
+                        "value": "now/d"
+                      }
+                    ]
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "End date"
+              }
+            }
+          },
+          "position": {
+            "x": 2,
+            "y": 0,
+            "width": 2,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "b2f4d3dd",
+            "queries": [
+              {
+                "name": "dashboards/01efac9216a11fffa3ae326cef9a1360/datasets/01f0673fb52a1570882e205c386e46ec_workspace_name",
+                "query": {
+                  "datasetName": "049a14ff",
+                  "fields": [
+                    {
+                      "name": "workspace_name",
+                      "expression": "`workspace_name`"
+                    },
+                    {
+                      "name": "workspace_name_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_dashboards/01efac9216a11fffa3ae326cef9a1360/datasets/01f01345463d1d82812bb7650ef937e3_param_workspace",
+                "query": {
+                  "datasetName": "f5da4429",
+                  "parameters": [
+                    {
+                      "name": "param_workspace",
+                      "keyword": "param_workspace"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-single-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "parameterName": "param_workspace",
+                    "queryName": "parameter_dashboards/01efac9216a11fffa3ae326cef9a1360/datasets/01f01345463d1d0eac27bd9674ac21b0_param_workspace"
+                  },
+                  {
+                    "parameterName": "param_workspace",
+                    "queryName": "parameter_dashboards/01efac9216a11fffa3ae326cef9a1360/datasets/01f01345463d1d27854877310a926888_param_workspace"
+                  },
+                  {
+                    "parameterName": "param_workspace",
+                    "queryName": "parameter_dashboards/01efac9216a11fffa3ae326cef9a1360/datasets/01f01345463d1d63b934216610b4c0fb_param_workspace"
+                  },
+                  {
+                    "parameterName": "param_workspace",
+                    "queryName": "parameter_dashboards/01efac9216a11fffa3ae326cef9a1360/datasets/01f01345463d1d82812bb7650ef937e3_param_workspace"
+                  },
+                  {
+                    "parameterName": "param_workspace",
+                    "queryName": "parameter_dashboards/01efac9216a11fffa3ae326cef9a1360/datasets/01f01345463d1d948d8498ec4e2ebcf5_param_workspace"
+                  },
+                  {
+                    "parameterName": "param_workspace",
+                    "queryName": "parameter_dashboards/01efac9216a11fffa3ae326cef9a1360/datasets/01f01345463d1dec946b92515c8f655a_param_workspace"
+                  },
+                  {
+                    "parameterName": "param_workspace",
+                    "queryName": "parameter_dashboards/01efac9216a11fffa3ae326cef9a1360/datasets/01f01345463d1e069314ff0a538aaabc_param_workspace"
+                  },
+                  {
+                    "fieldName": "workspace_name",
+                    "displayName": "workspace_name",
+                    "queryName": "dashboards/01efac9216a11fffa3ae326cef9a1360/datasets/01f0673fb52a1570882e205c386e46ec_workspace_name"
+                  }
+                ]
+              },
+              "selection": {
+                "defaultSelection": {
+                  "values": {
+                    "dataType": "STRING",
+                    "values": [
+                      {
+                        "value": "<ALL WORKSPACES>"
+                      }
+                    ]
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Workspace"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 0,
+            "width": 2,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "f4c75636",
+            "queries": [
+              {
+                "name": "dashboards/01efac9216a11fffa3ae326cef9a1360/datasets/01efacb531d7116eace5fc549a40b392_time_key",
+                "query": {
+                  "datasetName": "069df21d",
+                  "fields": [
+                    {
+                      "name": "time_key",
+                      "expression": "`time_key`"
+                    },
+                    {
+                      "name": "time_key_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_dashboards/01efac9216a11fffa3ae326cef9a1360/datasets/01eface1546f1957b208a0111252518e_param_time_key",
+                "query": {
+                  "datasetName": "f5da4429",
+                  "parameters": [
+                    {
+                      "name": "param_time_key",
+                      "keyword": "param_time_key"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-single-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "time_key",
+                    "displayName": "time_key",
+                    "queryName": "dashboards/01efac9216a11fffa3ae326cef9a1360/datasets/01efacb531d7116eace5fc549a40b392_time_key"
+                  },
+                  {
+                    "parameterName": "param_time_key",
+                    "queryName": "parameter_dashboards/01efac9216a11fffa3ae326cef9a1360/datasets/01efacdac1171fc39599215f42dc4c17_param_time_key"
+                  },
+                  {
+                    "parameterName": "param_time_key",
+                    "queryName": "parameter_dashboards/01efac9216a11fffa3ae326cef9a1360/datasets/01eface1546f1957b208a0111252518e_param_time_key"
+                  },
+                  {
+                    "parameterName": "param_time_key",
+                    "queryName": "parameter_dashboards/01efac9216a11fffa3ae326cef9a1360/datasets/01eface26b1c1a25a38e27ebfda9dcc8_param_time_key"
+                  }
+                ]
+              },
+              "selection": {
+                "defaultSelection": {
+                  "values": {
+                    "dataType": "STRING",
+                    "values": [
+                      {
+                        "value": "Week"
+                      }
+                    ]
+                  }
+                }
+              },
+              "disallowAll": true,
+              "frame": {
+                "showTitle": true,
+                "title": "View date by"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 1,
+            "width": 2,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "9a043919",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "f5da4429",
+                  "fields": [
+                    {
+                      "name": "result_state",
+                      "expression": "`result_state`"
+                    },
+                    {
+                      "name": "time_key",
+                      "expression": "`time_key`"
+                    },
+                    {
+                      "name": "countdistinct(run_id)",
+                      "expression": "COUNT(DISTINCT `run_id`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "time_key",
+                  "scale": {
+                    "type": "temporal"
+                  },
+                  "axis": {
+                    "hideLabels": false,
+                    "hideTitle": true
+                  },
+                  "displayName": "date"
+                },
+                "y": {
+                  "fieldName": "countdistinct(run_id)",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "axis": {
+                    "title": "Number of runs"
+                  },
+                  "displayName": "Number of runs"
+                },
+                "color": {
+                  "fieldName": "result_state",
+                  "scale": {
+                    "type": "categorical",
+                    "mappings": [
+                      {
+                        "value": "ERROR",
+                        "color": "#FF3621"
+                      },
+                      {
+                        "value": "SUCCEEDED",
+                        "color": "#00A972"
+                      },
+                      {
+                        "value": "SKIPPED",
+                        "color": "#8BCAE7"
+                      },
+                      {
+                        "value": "FAILED",
+                        "color": "#FCA4A1"
+                      },
+                      {
+                        "value": "TIMED_OUT",
+                        "color": "#919191"
+                      }
+                    ]
+                  },
+                  "displayName": "result_state"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Job Run Status Distribution",
+                "showDescription": true,
+                "description": ""
+              },
+              "mark": {
+                "layout": "stack"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 2,
+            "width": 3,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "e93148f7",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "f5da4429",
+                  "fields": [
+                    {
+                      "name": "termination_code",
+                      "expression": "`termination_code`"
+                    },
+                    {
+                      "name": "time_key",
+                      "expression": "`time_key`"
+                    },
+                    {
+                      "name": "countdistinct(run_id)",
+                      "expression": "COUNT(DISTINCT `run_id`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "time_key",
+                  "scale": {
+                    "type": "temporal"
+                  },
+                  "axis": {
+                    "hideTitle": true
+                  },
+                  "displayName": "date"
+                },
+                "y": {
+                  "fieldName": "countdistinct(run_id)",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "axis": {
+                    "title": "Number of runs"
+                  },
+                  "displayName": "Number of runs"
+                },
+                "color": {
+                  "fieldName": "termination_code",
+                  "scale": {
+                    "type": "categorical",
+                    "mappings": [
+                      {
+                        "value": "SUCCESS",
+                        "color": "#00A972"
+                      },
+                      {
+                        "value": "DRIVER_ERROR",
+                        "color": "#FCA4A1"
+                      },
+                      {
+                        "value": "INVALID_CLUSTER_REQUEST",
+                        "color": "#82514f"
+                      },
+                      {
+                        "value": "RUN_EXECUTION_ERROR",
+                        "color": "#a97700"
+                      },
+                      {
+                        "value": "CLOUD_FAILURE",
+                        "color": "#a90084"
+                      }
+                    ]
+                  },
+                  "displayName": "termination_code"
+                },
+                "label": {
+                  "show": false
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Job Run Termination Code Distribution",
+                "showDescription": true,
+                "description": ""
+              },
+              "mark": {
+                "layout": "percent-stack"
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 2,
+            "width": 3,
+            "height": 6
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS"
+    }
+  ],
+  "uiSettings": {
+    "theme": {
+      "widgetHeaderAlignment": "ALIGNMENT_UNSPECIFIED"
+    }
+  }
+}

@@ -1,0 +1,102 @@
+# Test customer profile C — enterprise multi-source, big-data
+#
+# A large enterprise with a mixed source landscape: legacy on-prem
+# Oracle, Azure SQL DB, Snowflake (already in their stack), and BigQuery
+# (analytics team brought it in). Multiple very large tables (>100M rows)
+# and tight compliance requirements (SOX, retention 7 years).
+#
+# Demonstrates the framework's handling of segmented loads at scale,
+# cloud DW staged extraction, multi-source ingestion in one customer,
+# and 4-environment promotion (dev → sit → uat → prod).
+#
+# Used as a fixture in tests/examples/dummycustomerc/ for the L3 E2E
+# tests of segmented loads + Snowflake staged extraction.
+
+# ─── Identity ──────────────────────────────────────────────────────────
+customer:
+  name: dummycustomerc
+  display_name: "DummyCustomer C Corp."
+  primary_contact: data-platform@dummycustomerc.example
+  cost_center: "DC-C-EnterpriseData"
+
+# ─── Environments ──────────────────────────────────────────────────────
+environments:
+  - name: dev
+    storage_account: dummycustomercdevsa
+    container: lake-dev
+    metadata_db_server: dcc-dev-sql.database.windows.net
+    metadata_db_database: lake_ingest_meta
+    region: westus2
+  - name: sit                                   # System-Integration env (4-tier promotion)
+    storage_account: dummycustomercsitsa
+    container: lake-sit
+    metadata_db_server: dcc-sit-sql.database.windows.net
+    metadata_db_database: lake_ingest_meta
+    region: westus2
+  - name: uat
+    storage_account: dummycustomercuatsa
+    container: lake-uat
+    metadata_db_server: dcc-uat-sql.database.windows.net
+    metadata_db_database: lake_ingest_meta
+    region: westus2
+  - name: prod
+    storage_account: dummycustomercprodsa
+    container: lake-prod
+    metadata_db_server: dcc-prod-sql.database.windows.net
+    metadata_db_database: lake_ingest_meta
+    region: westus2
+
+# ─── Sources ───────────────────────────────────────────────────────────
+sources:
+  - source_type: oracle
+    connection_patterns: [onprem_tns, cloud_wallet]
+    requires_shir: true                         # core ERP on-prem; some new on OCI
+  - source_type: azure_sql_db
+    connection_patterns: [msi, aad_oauth]
+    requires_shir: false
+  - source_type: snowflake
+    connection_patterns: [kv_keypair]           # JWT keypair auth
+    requires_shir: false
+  - source_type: bigquery
+    connection_patterns: [service_account_json]
+    requires_shir: false                        # cross-cloud read
+
+# ─── Features ──────────────────────────────────────────────────────────
+features:
+  segmented_loads: true                         # several >100M-row tables (Oracle ERP)
+  flattening: true                              # Snowflake VARIANT + BigQuery STRUCT cols
+  document_dataset_type: false                  # tabular only
+  cross_account_files: false
+  rest_api_generic: false
+  saas_apis: false
+  cloud_dw: true                                # primary feature for this customer
+  sap_hana: false
+  heartbeat_pipeline: true
+  auto_retry_on_partial: false                  # tight change control; operator drives
+  pii_classification: true                      # SOX requires identification + audit
+
+# ─── Constraints ───────────────────────────────────────────────────────
+constraints:
+  no_azure_functions: false                     # Functions OK for flattening engine
+  no_databricks: false                          # Databricks workspace exists
+  msi_only: false                               # Oracle + Snowflake auth requires secrets
+  private_endpoint_required: true
+  cmk_required: true                            # SOX requires CMK
+  egress_to_internet: false                     # all data flows in private network
+                                                # exception: BigQuery via Workload Identity Federation
+  shir_only_for_onprem: true
+  no_public_blob_access: true
+
+# ─── Compliance ────────────────────────────────────────────────────────
+compliance:
+  pii_required: true
+  data_residency: us                            # multi-region within US
+  retention_minimum_days: 2555                  # 7 years SOX
+  audit_log_retention_years: 7
+
+# ─── Slim trim preferences ─────────────────────────────────────────────
+trim:
+  include_runbooks: true
+  include_test_doctor: true
+  include_heartbeat_test: true
+  include_examples: true

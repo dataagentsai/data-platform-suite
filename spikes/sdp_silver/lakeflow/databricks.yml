@@ -1,0 +1,54 @@
+# ADR-035 spike step 1b: declarative silver on Lakeflow, serverless, Free Edition.
+#   databricks bundle deploy -p free && databricks bundle run sdp_silver_spike -p free
+bundle:
+  name: dp_sdp_silver_spike
+
+sync:
+  paths:
+    - ../../../src/dataplatform
+    - ./transformations
+
+variables:
+  contract_tag:
+    default: "c0"
+
+targets:
+  dev:
+    default: true
+    mode: development
+
+resources:
+  pipelines:
+    sdp_silver_spike:
+      name: dp-dev-sdp-silver-spike
+      catalog: dev_silver
+      schema: spike_sdp
+      serverless: true
+      continuous: false
+      libraries:
+        - file:
+            path: ./transformations/silver.py
+      configuration:
+        spike.source: /Volumes/dev_ops/spike/changes
+        spike.root: ${workspace.file_path}
+    sdp_silver_contract:
+      name: dp-dev-sdp-silver-contract
+      catalog: dev_silver
+      schema: spike_contract
+      serverless: true
+      continuous: false
+      libraries:
+        - file:
+            path: ./transformations/contract.py
+      configuration:
+        spike.root: ${workspace.file_path}
+        contract.base: /Volumes/dev_ops/spike/changes/contract/${var.contract_tag}
+    sdp_bronze_probe:
+      name: dp-dev-sdp-bronze-probe
+      catalog: dev_silver
+      schema: spike_contract
+      serverless: true
+      continuous: false
+      libraries:
+        - file:
+            path: ./transformations/probe_bronze.py
