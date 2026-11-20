@@ -25,7 +25,7 @@ sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT / "scripts"))
 
 from platform_binding import attach_meta, build_engine  # noqa: E402
-from run_world import DEFAULT_CATALOG, sinks  # noqa: E402
+from run_world import DEFAULT_SLICE, catalog_for, sinks  # noqa: E402
 
 from dataplatform.hop_reports import KINDS, dump  # noqa: E402
 from dataplatform.world import dwd as dwd_loader  # noqa: E402
@@ -93,7 +93,8 @@ def main() -> int:
                     help="ingest only: a copy of the mock sources to open (a job on its own machine)")
     ap.add_argument("--db", choices=["postgres", "sqlite"], default=os.environ.get("WORLD_DB", "postgres"))
     ap.add_argument("--meta", choices=["postgres", "lakebase"], default=os.environ.get("DP_RUN_META", "postgres"))
-    ap.add_argument("--catalog", type=Path, default=DEFAULT_CATALOG)
+    ap.add_argument("--slice", default=os.environ.get("DP_SLICE", DEFAULT_SLICE))
+    ap.add_argument("--catalog", type=Path, default=None, help="a slice folder by path (default: --slice in the catalog)")
     ap.add_argument("--calendar", default=None)
     ap.add_argument("--no-silver", dest="silver", action="store_false")
     ap.add_argument("--no-gold", dest="gold", action="store_false")
@@ -109,10 +110,11 @@ def main() -> int:
         ap.error("--hop gold needs gold")
     a.gold = a.gold and a.hop == "gold"  # only the gold hop builds the gold adapters
 
+    a.catalog = a.catalog or catalog_for(a.slice)
     dwd = dwd_loader.load(a.catalog, a.calendar)
     tz = dwd.world["clock"]["business_timezone"]
     store = attach_meta(a.meta)
-    eng = build_engine(a, tz)
+    eng = build_engine(a, tz, dwd=dwd)
     try:
         report = HOPS[a.hop](a, store, dwd, tz, eng)
     finally:

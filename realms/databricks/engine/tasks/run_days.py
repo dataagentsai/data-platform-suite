@@ -1,4 +1,4 @@
-"""The tyre world, N days, on Databricks: the same day loop as the laptop (scripts/run_platform.py), on the job's own
+"""The chosen slice's world (--slice, default the tyre company), N days, on Databricks: the same day loop as the laptop (scripts/run_platform.py), on the job's own
 Spark session, Unity Catalog managed Iceberg tables (<env>_<layer>.<schema>.<table>) and the metadata store on
 Lakebase as the job's identity. The simulated world (sources, landing) lives on the driver's local disk; the ops page
 and the report are copied to the volume <env>_ops.reports.runs/<run id>/ to open afterwards."""
@@ -11,6 +11,7 @@ import sys
 from pathlib import Path
 
 p = argparse.ArgumentParser()
+p.add_argument("--slice", default="02-tyre", help="the catalog slice to run (a folder of _catalog/slices/)")
 p.add_argument("--days", default="3")
 p.add_argument("--scale", default="0.1")
 p.add_argument("--calendar", default="", help="a named world calendar; empty = the world's own")
@@ -27,7 +28,7 @@ catalog = next(d for d in (root / "realms/databricks/engine/_catalog", base / "_
 os.environ.update(DP_CATALOG=str(catalog), DP_META_INSTANCE=a.meta_instance, DP_META_DATABASE="dp_meta_proof",
                   DP_TOKEN_KEY=secrets.token_hex(32))  # a fresh key per proof run, never stored
 out = Path(f"/tmp/dp-proof-{a.run_id}")
-sys.argv = ["run_platform.py", "--days", a.days, "--scale", a.scale, "--db", "sqlite", "--meta", "lakebase",
+sys.argv = ["run_platform.py", "--slice", a.slice, "--days", a.days, "--scale", a.scale, "--db", "sqlite", "--meta", "lakebase",
             "--spark", "existing", "--table-format", "iceberg-uc", "--env", a.env, "--upkeep-every", "7", "--reset-tables",
             "--out", str(out), *(["--calendar", a.calendar] if a.calendar else []),
             *(["--housekeeping-days", a.housekeeping_days, "--prove-rebuild"] if a.housekeeping_days else [])]
@@ -57,7 +58,11 @@ finally:
         for note in publish(spark, json.loads((out / "ops_tables.json").read_text()), f"{a.env}_ops", "ops"):
             print(f"ops tables: {note}")
     semantic_failed = 0
-    generated = root / "realms/databricks/semantic_governance/generated/tyre" / a.env
+    import yaml  # the job's environment lists pyyaml
+
+    platform = yaml.safe_load((catalog / "slices" / a.slice / "manifest/platform.yaml").read_text())
+    domain = str(platform["domain"])  # generated/<domain>/<env>: the business metric views of this domain, if any
+    generated = root / "realms/databricks/semantic_governance/generated" / domain / a.env
     if not code and (out / "report.json").exists() and generated.exists():  # the business metric views (B12)
         import json
 

@@ -1,0 +1,8 @@
+# Terraform state for prod, in an Azure storage account made once by `make bootstrap` (Makefile). Copy to
+# prod.backend.hcl (git-ignored) and fill in. No subscription id and no key here: the subscription comes from the
+# environment and access is Entra ID.
+resource_group_name  = "changeme-tfstate-rg"
+storage_account_name = "changemetfstate" # 3 to 24 lowercase letters and digits, global
+container_name       = "tfstate"
+key                  = "platform/prod.tfstate"
+use_azuread_auth     = true

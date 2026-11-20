@@ -1,4 +1,5 @@
 """Run the tyre world and the platform together, day by day, locally: world -> sources -> landing -> bronze -> silver.
+(--slice 03-clinical runs the clinical trial instead: the world in the slice picks the domain, models and gold judge.)
 
     python scripts/run_platform.py --days 14                 # local PostgreSQL for the sources and the metadata store
     python scripts/run_platform.py --days 3 --scale 0.05     # small and quick
@@ -14,7 +15,7 @@ each run; or in memory). Silver (W1c): after each day's ingestion, one silver ru
 driver) takes the new bronze batches through the thirteen stages into Delta tables under build/run/silver/, and
 silver is compared with the oracle's silver totals for the day; DEL-01, SCD-02, LATE-03 and DUP-04 are judged on what
 silver holds. The mass-delete guard compares each full copy with silver's current keys. Gold (W1d): after silver,
-one gold run for the day's business date builds the dimensions and the facts (models/tyre/gold/) into Delta tables
+one gold run for the day's business date builds the dimensions and the facts (models/<domain>/gold/, the domain the world names) into Delta tables
 under build/run/gold/, and gold is compared with the oracle's gold for the day; LATE-01, LATE-02, HIST-05, DEL-01 and
 DUP-01 are judged on gold. After the last day the metric views' known answers are asked of gold
 (build/run/gold_metrics.json, the DP_GOLD_METRICS file W5's tests read). Report: build/run/report.json.
@@ -39,8 +40,9 @@ sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT / "scripts"))
 
 from platform_binding import build_engine  # noqa: E402
-from run_world import DEFAULT_CATALOG, sinks  # noqa: E402
+from run_world import DEFAULT_SLICE, catalog_for, sinks  # noqa: E402
 
+from dataplatform import contract as odcs  # noqa: E402
 from dataplatform.adapters.delta_bronze import DeltaBronze  # noqa: E402
 from dataplatform.adapters.files import FileLanding  # noqa: E402
 from dataplatform.adapters.http_api import HttpRecordClient, serve  # noqa: E402
@@ -119,7 +121,7 @@ class SimClock:
 
 
 def write_ops_page(a: Any, days: list[Any], silver_days: list[Any], gold_days: list[Any], monitor: Any, clock: Any,
-                   tables: Any, store: Any) -> Path:
+                   tables: Any, store: Any, domain: str = "tyre") -> Path:
     """The local ops page (B10): the ops tables the dashboards read, plus every layer against the oracle, the
     planted incidents' verdicts and the delay per hop, in one HTML file beside the run."""
     from dataplatform.obs.page import render
@@ -136,7 +138,7 @@ def write_ops_page(a: Any, days: list[Any], silver_days: list[Any], gold_days: l
                   ("silver", [v for s, _ in silver_days for v in s.verdicts]),
                   ("gold", [v for g, _ in gold_days for v in g.verdicts])) for v in items]
     hops = hop_delays(a, tables, store, monitor.domain)
-    html = render(ops, "Tyre platform: local run", f"{len(days)} day(s), scale {a.scale}, "
+    html = render(ops, f"{domain.capitalize()} platform: local run", f"{len(days)} day(s), scale {a.scale}, "
                   f"engine {a.engine}, table format {a.table_format}, change capture {a.cdc_shape}. This local run "
                   "loads once per simulated day, so datasets promised hourly freshness show breaches between days: "
                   "that is the schedule, not a fault.", checks, incidents, hops)
@@ -316,7 +318,10 @@ def main() -> int:
     ap.add_argument("--scale", type=float, default=1.0)
     ap.add_argument("--db", choices=["postgres", "sqlite"], default=os.environ.get("WORLD_DB", "postgres"))
     ap.add_argument("--meta", choices=["postgres", "memory", "lakebase"], default=os.environ.get("DP_RUN_META", "postgres"))
-    ap.add_argument("--catalog", type=Path, default=DEFAULT_CATALOG)
+    ap.add_argument("--slice", default=os.environ.get("DP_SLICE", DEFAULT_SLICE),
+                    help="the catalog slice to run, e.g. 03-clinical (default 02-tyre); the world in it picks the "
+                         "domain model, the gold models and the gold judge")
+    ap.add_argument("--catalog", type=Path, default=None, help="a slice folder by path (default: --slice in the catalog)")
     ap.add_argument("--calendar", default=None, help="a named calendar from world.yaml, e.g. compressed: every "
                     "incident on days 2-3, for the 3-day loop (default: the world's own calendar)")
     ap.add_argument("--out", type=Path, default=ROOT / "build/run")
@@ -359,6 +364,7 @@ def main() -> int:
                     help="after the last day, rebuild silver from bronze for every dataset that got a baseline and "
                          "check its current rows did not change (B8: a trimmed bronze still rebuilds silver)")
     a = ap.parse_args()
+    a.catalog = a.catalog or catalog_for(a.slice)
     if hasattr(sys.stdout, "reconfigure"):  # a long run shows each day as it ends (not on a Databricks job stream)
         sys.stdout.reconfigure(line_buffering=True)  # type: ignore[attr-defined]
 
@@ -434,6 +440,7 @@ def main() -> int:
     guard = SourceGuard(time.monotonic, time.sleep)  # retry, circuit breaker, connection cap for pulls (B7)
     sources = Sources(landing, s.db, api, s.stream, {n.split(".")[0]: d.system for n, d in dwd.datasets.items()}, tz,
                       guard)
+    tokenizer = KeyedTokenizer.from_env_or_file(ROOT / "build/.token_key")
     world = World(dwd, model_for(dwd, a.scale), s, a.out / "world")
     silver_days: list[Any] = []
     gold_days: list[Any] = []
@@ -448,7 +455,7 @@ def main() -> int:
                     dropped += 1
             print(f"reset: {dropped} tables dropped in {a.env}_bronze, {a.env}_silver, {a.env}_gold")
 
-    eng = build_engine(a, tz, on_store=reset_tables)
+    eng = build_engine(a, tz, on_store=reset_tables, dwd=dwd)
     spark, tables, stages, gold = eng.spark, eng.tables, eng.stages, eng.gold
     table_store, bronze_writer, local_session = eng.table_store, eng.bronze_writer, eng.local_session
     if table_store is not None and gold is not None:
@@ -473,7 +480,14 @@ def main() -> int:
         ds = dwd.datasets.get(name)
         if ds is None or dwd.kind_of(ds.system) != "database":
             return None
-        return list(s.db.rows(ds.system, ds.table))
+        rows = list(s.db.rows(ds.system, ds.table))
+        restricted = {p["name"]: p["classification"] for p in odcs.properties(ds.contract)
+                      if p.get("classification") in ("restricted",)}
+        for r in rows:  # silver holds a restricted value as its token, so the live source is compared as stored
+            for col, cls in restricted.items():
+                if r.get(col) not in (None, ""):
+                    r[col] = tokenizer.token(cls, str(r[col]))
+        return rows
 
     bronze = bronze_writer if bronze_writer is not None else DeltaBronze(a.out / "bronze")
 
@@ -566,10 +580,10 @@ def main() -> int:
 
             if a.hops != "inline":
                 s = judge_silver(day.day, day.oracle, run_hop("silver", f"silver-{day.date}", day.date), store,
-                                 tables, dwd.platform["domain"], KeyedTokenizer.PATTERN, live_rows)
+                                 tables, dwd.platform["domain"], KeyedTokenizer.PATTERN, live_rows, tokenizer.token)
             else:
                 s = silver_day(day.day, day.oracle, store, tables, stages, dwd.platform["domain"], "dev",
-                               KeyedTokenizer.PATTERN, live=live_rows)
+                               KeyedTokenizer.PATTERN, live=live_rows, tokenize=tokenizer.token)
             silver_days.append((s, round(time.time() - t, 1)))
             show_silver(s)
         if gold is not None:
@@ -603,19 +617,19 @@ def main() -> int:
             a.days,
             store,
             bronze,
-            KeyedTokenizer.from_env_or_file(ROOT / "build/.token_key"),
+            tokenizer,
             sources,
             mover(dwd, landing, s, tz, a.cdc_shape, clock),
             dwd.platform["domain"],
             "dev",
-            "tyre",
+            dwd.platform["domain"],
             on_day,
             silver=tables,
             run_ingest=(lambda run_id, window: run_hop("ingest", run_id, window)) if a.hops != "inline" else None,
         )
         rebuilt = prove_rebuild_after(days) if a.prove_rebuild and tables is not None else None
         metrics = gold_metrics(a, gold[2], tz) if gold is not None else {}
-        page = write_ops_page(a, days, silver_days, gold_days, monitor_box[0], clock, tables, store)  # Spark still up
+        page = write_ops_page(a, days, silver_days, gold_days, monitor_box[0], clock, tables, store, dwd.platform["domain"])  # Spark still up
         scores = success_scorecard(a, days, silver_days, gold_days, store,
                                    hop_delays(a, tables, store, dwd.platform["domain"]), time.time() - t0,
                                    tables=tables, domain=dwd.platform["domain"])
@@ -652,7 +666,7 @@ def main() -> int:
             for d in days
         ],
         "known_answers": last["known_answers"],
-        "corrections": len(store.corrections("erp", "sales_order_line")),
+        "corrections": sum(len(store.corrections(*n.split(".", 1))) for n in dwd.datasets),
         "silver_equals_oracle": all(s.ok for s, _ in silver_days) if a.silver else None,
         "gold_equals_oracle": all(g.ok for g, _ in gold_days) if gold_days else None,
         "gold": [

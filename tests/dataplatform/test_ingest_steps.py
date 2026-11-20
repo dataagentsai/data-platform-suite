@@ -189,6 +189,29 @@ def test_mass_delete(case, read, previous, now, limit, held):
 # ---------------------------------------------------------------- protect (DPC-0070)
 KEY = b"k" * 32
 
+RESTRICTED_KEY = (Column("id", "string", True, 1, "", "restricted"), Column("qty", "integer", True))
+
+
+@pytest.mark.parametrize(
+    ("case", "known", "now", "held"),
+    [
+        ("same keys, stored as tokens", list("ABCDEFGHIJ"), list("ABCDEFGHIJ"), False),
+        ("one key gone of ten, within 5%+", list("ABCDEFGHIJ"), list("ABCDEFGHI"), True),
+        ("a new key is not a delete", list("ABCDEFGHIJ"), list("ABCDEFGHIJK"), False),
+        ("almost all gone", list("ABCDEFGHIJ"), list("AB"), True),
+    ],
+)
+def test_mass_delete_compares_restricted_keys_as_stored(case, known, now, held):
+    """Silver holds a restricted key as its token; the copy's clear keys must be compared as tokens, or every copy
+    would look like a total delete (the clinical subject copy)."""
+    from dataplatform.adapters.keyed_tokens import KeyedTokenizer
+
+    tok = KeyedTokenizer(KEY)
+    previous = {(tok.token("restricted", k),) for k in known}
+    reason = mass_delete_problem(spec(read="full_copy", mass=0.05, columns=RESTRICTED_KEY),
+                                 [{"id": k, "qty": "1"} for k in now], previous, tok)
+    assert bool(reason) is held
+
 
 @pytest.mark.parametrize(
     ("case", "value", "tokenised"),

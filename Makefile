@@ -161,8 +161,14 @@ endif
 
 SILVER ?= 1
 GOLD ?= 1
+# SLICE=03-clinical runs the clinical trial (slices/<SLICE> of the catalog, DP_CATALOG or ~/data-platform-catalog);
+# CATALOG=/path/to/slice picks a slice folder by path; CALENDAR=compressed puts every incident on days 2-3.
+# The world in the slice picks the domain model, the gold models (models/<domain>) and the gold judge. Default: tyre.
+SLICE ?=
+CATALOG ?=
+CALENDAR ?=
 run:
-	$(ENGINE_PY) python scripts/run_platform.py --engine $(ENGINE) --days $(DAYS) --scale $(SCALE) --db $(WORLD_DB) $(if $(filter 0,$(SILVER)),--no-silver,) $(if $(filter 0,$(GOLD)),--no-gold,)
+	$(ENGINE_PY) python scripts/run_platform.py --engine $(ENGINE) --days $(DAYS) --scale $(SCALE) --db $(WORLD_DB) $(if $(SLICE),--slice $(SLICE),) $(if $(CATALOG),--catalog $(CATALOG),) $(if $(CALENDAR),--calendar $(CALENDAR),) $(if $(filter 0,$(SILVER)),--no-silver,) $(if $(filter 0,$(GOLD)),--no-gold,)
 
 # The same days with ingestion, silver and gold each as its own process (scripts/run_hop.py), the shape deployed jobs
 # have; the day is judged from the reports the hops save. Needs local PostgreSQL for the metadata store.

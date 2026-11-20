@@ -19,8 +19,34 @@ from typing import Any
 from dataplatform.adapters.postgres_meta import PostgresMetaStore
 
 
+def _project_endpoint(client: Any, name: str) -> tuple[str, str] | None:
+    """(endpoint resource name, host) of a Lakebase project's read-write endpoint on its default branch, or None when
+    the workspace has no such project. Lakebase on Azure Databricks is the project (autoscaling) kind, found over REST
+    so an older SDK works too; the first cloud's provisioned instances are the fallback (first real Azure run, 19 Nov
+    2026: the instance endpoint answered "Resource not found" for a project)."""
+    api = getattr(client, "api_client", None)
+    if api is None:
+        return None
+    try:
+        reply = api.do("GET", f"/api/2.0/postgres/projects/{name}/branches/production/endpoints")
+    except Exception as exc:  # noqa: BLE001 -- the SDK's NotFound, found by name so the SDK is never imported here
+        if type(exc).__name__ == "NotFound":
+            return None
+        raise
+    for ep in reply.get("endpoints", []):
+        status = ep.get("status", {})
+        host = status.get("hosts", {}).get("host")
+        if status.get("endpoint_type") == "ENDPOINT_TYPE_READ_WRITE" and host:
+            return str(ep["name"]), str(host)
+    return None
+
+
 def instance_dsn(client: Any, instance: str, database: str) -> str:
     """host, port, database and user for the instance; no password (the token is passed separately)."""
+    project = _project_endpoint(client, instance)
+    if project is not None:
+        user = client.current_user.me().user_name
+        return f"host={project[1]} port=5432 dbname={database} user={user} sslmode=require"
     if hasattr(client, "database"):
         host = client.database.get_database_instance(name=instance).read_write_dns
     else:  # an older SDK (serverless environment 3, probed 13 Nov) has no database API: the REST endpoint instead
@@ -30,6 +56,9 @@ def instance_dsn(client: Any, instance: str, database: str) -> str:
 
 
 def instance_token(client: Any, instance: str) -> str:
+    project = _project_endpoint(client, instance)
+    if project is not None:
+        return str(client.api_client.do("POST", "/api/2.0/postgres/credentials", body={"endpoint": project[0]})["token"])
     request_id = str(uuid.uuid4())
     if hasattr(client, "database"):
         cred = client.database.generate_database_credential(instance_names=[instance], request_id=request_id)

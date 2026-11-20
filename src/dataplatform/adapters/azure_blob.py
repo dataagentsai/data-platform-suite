@@ -1,11 +1,12 @@
 """Object storage on Azure Blob Storage (cloud layer): landing_store, the partner file drop and object_store.
 Needs azure-storage-blob (the `azure` extra) only when a real client is built; nothing here imports an Azure SDK. The
 container is passed in as an object with the surface of azure.storage.blob.ContainerClient (list_blobs,
-upload_blob, download_blob, get_blob_properties), built by the platform from the job's managed identity; no keys are
+upload_blob, download_blob, get_blob_client), built by the platform from the job's managed identity; no keys are
 ever read here.
 
-TESTED AGAINST A FAKE OF THAT SURFACE ONLY (tests/dataplatform/azure_fakes.py). Not against Azurite and not against a
-real Azure account: where the real service may differ, nothing here has proved it does not.
+Tested against a fake of that surface (tests/dataplatform/azure_fakes.py) and, 19 Nov 2026, against a real ADLS Gen2
+account (landing write/list/read/manifest/duplicate refusal and the file drop). The first real run found that the fake
+had a method (container.get_blob_properties) the real ContainerClient lacks; the fake now matches the real surface.
 
 Landing layout matches adapters/files.py and adapters/s3.py, so the lander cannot tell them apart:
     <container>/<prefix><source>/<dataset>/<window>/<name>                  the data file, JSON lines
@@ -133,7 +134,7 @@ class AzureFileDrop:
     def list(self, system: str, dataset: str) -> list[DropFile]:
         files = []
         for key in _names(self.container, self._dir(system, dataset)):
-            props = self.container.get_blob_properties(key)
+            props = self.container.get_blob_client(key).get_blob_properties()  # the real ContainerClient has no get_blob_properties of its own
             meta = props.metadata or {}
             arrived = meta.get("arrived_at") or props.last_modified.astimezone(UTC).isoformat()
             files.append(DropFile(key.rsplit("/", 1)[1], arrived, props.size, meta.get("checksum", "")))

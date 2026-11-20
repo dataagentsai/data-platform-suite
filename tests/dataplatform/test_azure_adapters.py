@@ -144,7 +144,7 @@ def test_file_drop_arrival_travels_as_metadata(case: str, given: str, stored: st
     c = FakeContainer()
     f = AzureFileDrop(c, prefix="p/").put("sys", "ds", "a.csv", b"x", given)
     assert f.arrived_at == stored
-    assert c.get_blob_properties("p/sys/ds/a.csv").metadata == {"arrived_at": stored, "checksum": f.checksum}
+    assert c.get_blob_client("p/sys/ds/a.csv").get_blob_properties().metadata == {"arrived_at": stored, "checksum": f.checksum}
 
 
 def test_file_drop_without_metadata_falls_back_to_last_modified() -> None:

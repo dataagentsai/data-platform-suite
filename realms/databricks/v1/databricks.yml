@@ -23,7 +23,7 @@ sync:
   paths:
     - ../../../src/dataplatform
     - ../../../scripts
-    - ../../../models/tyre
+    - ../../../models            # every domain's gold models; the run picks models/<domain> from the world
     - .
   include:
     - _catalog/**        # git-ignored (a copy of data-platform-catalog/slices/02-tyre), so listed here

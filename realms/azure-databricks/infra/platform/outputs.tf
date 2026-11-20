@@ -1,0 +1,11 @@
+output "resource_group" { value = module.resource_group.name }
+output "workspace_url" { value = module.workspace.workspace_url }
+output "workspace_id" { value = module.workspace.workspace_id }
+output "storage_account" { value = module.storage.account_name }
+output "personal_storage_account" { value = module.storage.personal_account_name }
+output "containers" { value = module.storage.containers }
+output "catalogs" { value = module.unity_catalog.catalogs }
+output "landing_volume_path" { value = module.unity_catalog.landing_volume_path }
+output "metadata_store" { value = module.lakebase.project_name }
+output "key_vault" { value = module.key_vault.name }
+output "budget" { value = module.budget.name }

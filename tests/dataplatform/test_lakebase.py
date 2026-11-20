@@ -82,4 +82,62 @@ def test_an_older_sdk_uses_the_rest_endpoints() -> None:
     client, seen = OldSdk(), {}
     connect_lakebase("dp-meta-dev", "dp_meta", client, lambda dsn, password: seen.update(p=password) or Conn())
     assert seen["p"] == "t1"
-    assert client.calls == [("GET", "/api/2.0/database/instances/dp-meta-dev"), ("POST", "/api/2.0/database/credentials")]
+    project = ("GET", "/api/2.0/postgres/projects/dp-meta-dev/branches/production/endpoints")  # asked first, twice
+    instance = ("GET", "/api/2.0/database/instances/dp-meta-dev")
+    assert client.calls == [project, instance, project, ("POST", "/api/2.0/database/credentials")]
+
+
+class NotFound(Exception):
+    """Stands for databricks.sdk.errors.NotFound (same name on purpose)."""
+
+
+class ProjectSdk:
+    """A client of a workspace that has Lakebase projects (Azure Databricks): GET lists the project's endpoints."""
+
+    def __init__(self, endpoints: list[dict[str, Any]] | None) -> None:
+        self.calls: list[tuple[str, str, Any]] = []
+        self.endpoints = endpoints
+        self.api_client = SimpleNamespace(do=self._do)
+        self.current_user = SimpleNamespace(me=lambda: SimpleNamespace(user_name="dev.user@example.org"))
+
+    def _do(self, method: str, path: str, body: Any = None) -> dict[str, Any]:
+        self.calls.append((method, path, body))
+        if method == "GET" and "/postgres/projects/" in path:
+            if self.endpoints is None:
+                raise NotFound("Resource not found")
+            return {"endpoints": self.endpoints}
+        if method == "GET":
+            return {"read_write_dns": "inst.example"}
+        return {"token": "t2"}
+
+
+def _endpoint(kind: str, host: str | None, name: str = "projects/dp-meta-dev/branches/production/endpoints/primary"):
+    return {"name": name, "status": {"endpoint_type": kind, "hosts": {"host": host} if host else {}}}
+
+
+# (case, endpoints, want host or None, want token call)
+PROJECT_CASES = [
+    ("read-write endpoint", [_endpoint("ENDPOINT_TYPE_READ_WRITE", "ep.example")], "ep.example", True),
+    ("read-only endpoints are skipped", [_endpoint("ENDPOINT_TYPE_READ_ONLY", "ro.example"),
+                                         _endpoint("ENDPOINT_TYPE_READ_WRITE", "rw.example")], "rw.example", True),
+    ("endpoint with no host yet falls back", [_endpoint("ENDPOINT_TYPE_READ_WRITE", None)], "inst.example", False),
+    ("no such project falls back to the instance", None, "inst.example", False),
+]
+
+
+@pytest.mark.parametrize(("case", "endpoints", "host", "project"), PROJECT_CASES, ids=[c[0] for c in PROJECT_CASES])
+def test_project_or_instance(case: str, endpoints: Any, host: str, project: bool) -> None:
+    """Lakebase on Azure is a project; the first cloud's is an instance. The adapter finds which, by asking."""
+    client = ProjectSdk(endpoints)
+    dsn = instance_dsn(client, "dp-meta-dev", "dp_meta")
+    assert dsn == f"host={host} port=5432 dbname=dp_meta user=dev.user@example.org sslmode=require"
+    from dataplatform.adapters.lakebase import instance_token
+
+    token = instance_token(client, "dp-meta-dev")
+    posts = [c for c in client.calls if c[0] == "POST"]
+    if project:
+        assert token == "t2"
+        assert posts == [("POST", "/api/2.0/postgres/credentials",
+                          {"endpoint": "projects/dp-meta-dev/branches/production/endpoints/primary"})]
+    else:
+        assert posts[0][1] == "/api/2.0/database/credentials"

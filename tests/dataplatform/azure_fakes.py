@@ -46,7 +46,7 @@ class _Download:
 
 @dataclass
 class FakeContainer:
-    """The ContainerClient surface: list_blobs, upload_blob, download_blob, get_blob_properties."""
+    """The ContainerClient surface: list_blobs, upload_blob, download_blob, get_blob_client (-> get_blob_properties)."""
 
     _blobs: dict[str, tuple[bytes, dict[str, str], datetime]] = field(default_factory=dict)
     _clock: datetime = datetime(2026, 11, 1, tzinfo=UTC)
@@ -73,11 +73,25 @@ class FakeContainer:
             raise ResourceNotFoundError(f"The specified blob does not exist: {name}")
         return _Download(self._blobs[name][0])
 
-    def get_blob_properties(self, name: str) -> _Props:
+    def get_blob_client(self, name: str) -> "_BlobClient":
+        return _BlobClient(self, name)
+
+    def _props(self, name: str) -> _Props:
         if name not in self._blobs:
             raise ResourceNotFoundError(f"The specified blob does not exist: {name}")
         data, meta, stamped = self._blobs[name]
         return _Props(dict(meta), len(data), stamped)
+
+
+@dataclass(frozen=True)
+class _BlobClient:
+    """BlobClient: the only place the real SDK offers get_blob_properties."""
+
+    _container: FakeContainer
+    _name: str
+
+    def get_blob_properties(self) -> _Props:
+        return self._container._props(self._name)
 
 
 @dataclass(frozen=True)

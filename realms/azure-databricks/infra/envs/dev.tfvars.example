@@ -1,0 +1,11 @@
+# dev: cheapest settings. Copy to dev.tfvars (git-ignored) and fill the owner values; see RUNBOOK.md.
+# The subscription id is NOT set here: export TF_VAR_subscription_id (or ARM_SUBSCRIPTION_ID).
+env         = "dev"
+name_prefix = "changeme" # short, unique to the owner; letters and digits; storage account names are global
+location    = "eastus2"  # must offer Lakebase (README, Region)
+
+force_destroy              = true  # destroy drops the catalogs with their contents
+key_vault_purge_protection = false
+lakebase_enabled           = true
+budget_usd                 = 20
+budget_emails              = [] # owner addresses go in the untracked dev.tfvars

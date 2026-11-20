@@ -1,0 +1,9 @@
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+*.tfplan
+infra/envs/*.tfvars
+infra/envs/*.backend.hcl
+bundle/.databricks/
+__pycache__/

@@ -88,6 +88,10 @@ def judge(day: int, finding: dict[str, Any], d: DatasetReport | None) -> Verdict
         return v(
             "handled" if c.get("held_mass_delete", 0) else "missed", "; ".join(d.reasons) if d else "dataset not run"
         )
+    if det == "DEL-01" and finding["detail"].get("via") == "full_copy":
+        return v("deferred", "the next full copy lacks the key; silver's key comparison marks it deleted (W1c)")
+    if det == "SCD-02" and "field" in finding["detail"]:
+        return v("deferred", "a master record changed value; silver closes the old version and opens the new (W1c)")
     if det in NOTICED:
         return v("flagged" if noticed.get(det, 0) else "missed", f"{noticed.get(det, 0)} {NOTICED[det]}")
     if det in DEFERRED:

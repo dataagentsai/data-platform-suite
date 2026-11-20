@@ -9,6 +9,7 @@ p = argparse.ArgumentParser()
 p.add_argument("--root", required=True)
 p.add_argument("--meta-instance", required=True)
 p.add_argument("--schema", required=True)
+p.add_argument("--domain", default="tyre", help="the platform domain whose datasets the metadata store holds")
 a, _ = p.parse_known_args()
 sys.path.insert(0, os.path.join(a.root, "src"))  # the bundle syncs src/dataplatform under the bundle root
 for c in (a.root, os.path.join(a.root, "..", "..", "..", "src")):
@@ -76,8 +77,10 @@ def lakebase():
     from dataplatform.adapters.lakebase import meta_store_from_env
 
     store = meta_store_from_env()
-    return f"{len(store.datasets('tyre'))} tyre datasets, rules for erp.sales_order_line: " \
-           f"{len(store.dq_rules('erp', 'sales_order_line'))}"
+    refs = [r for r in store.datasets(a.domain) if r.kind == "dataset"]
+    first = refs[0] if refs else None
+    return f"{len(store.datasets(a.domain))} {a.domain} datasets, rules for {first.source}.{first.dataset}: " \
+           f"{len(store.dq_rules(first.source, first.dataset))}" if first else f"no {a.domain} datasets"
 
 
 check("Lakebase as the job's identity", lambda: lakebase())

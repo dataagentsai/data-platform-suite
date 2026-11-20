@@ -36,7 +36,15 @@ from dataplatform.world import dwd as dwd_loader  # noqa: E402
 from dataplatform.world.domains import model_for  # noqa: E402
 from dataplatform.world.engine import Sinks, World  # noqa: E402
 
-DEFAULT_CATALOG = Path(os.environ.get("DP_CATALOG", Path.home() / "data-platform-catalog")) / "slices/02-tyre"
+DEFAULT_SLICE = "02-tyre"
+CATALOG_ROOT = Path(os.environ.get("DP_CATALOG", Path.home() / "data-platform-catalog"))
+DEFAULT_CATALOG = CATALOG_ROOT / "slices" / DEFAULT_SLICE
+
+
+def catalog_for(slice_name: str | None) -> Path:
+    """The slice folder a run uses: `--slice 03-clinical` picks slices/03-clinical of the catalog (DP_CATALOG, default
+    ~/data-platform-catalog); the domain, its gold judge and its gold models all follow from the world in it."""
+    return CATALOG_ROOT / "slices" / (slice_name or DEFAULT_SLICE)
 
 
 def aws_sinks(prefix: str, env: str) -> tuple[Any, Any]:

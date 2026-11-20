@@ -1,0 +1,25 @@
+GOES IN: four sales order lines
+  order_id  dealer_code  plant_code  ordered_qty  cycle_state
+  SO-1001   D-1001       P-CHN       40           curing
+  SO-1002   D-1002       P-XXX       12           curing
+  SO-1003   D-1003       P-HUN       -5           idle
+  SO-1004   (empty)      P-HUN       8            resting
+
+THE RULES IN THE PLAN (name, severity, action)
+  order_id_present            critical  quarantine
+  dealer_code_present         critical  quarantine
+  ordered_qty-sql-1           critical  quarantine
+  plant_code-invalidValues-1  major     quarantine
+  cycle_state-invalidValues-1 minor     flag
+
+COMES OUT 1: good rows (order_id, _dq_flags)
+  SO-1001  []
+
+COMES OUT 2: quarantine records (stage, reason, original row)
+  quality  plant_code-invalidValues-1  SO-1002  plant P-XXX
+  quality  ordered_qty-sql-1           SO-1003  quantity -5
+  quality  dealer_code_present         SO-1004  dealer empty
+
+COMES OUT 3: counts
+  flagged  = 0
+  critical = 2

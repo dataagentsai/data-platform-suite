@@ -12,7 +12,7 @@ Domain-free: it knows DAC ids and the oracle's shape, not tyres.
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Any
@@ -27,6 +27,7 @@ from dataplatform.silver.runner import SilverReport, build_silver
 
 TOLERANCE = 0.01  # sums are rounded to cents by both sides
 BY_HOUR = "today_by_event_hour"
+Tokenize = Callable[[str, str], str]  # (column class, clear value) -> token: how ingestion protected a restricted value
 SILVER_DETECTORS = ("DEL-01", "SCD-02", "LATE-03", "DUP-04", "REC-05")
 
 
@@ -90,8 +91,19 @@ def compare(oracle_silver: dict[str, Any], tables: SilverTables, ps: dict[str, S
     return out
 
 
+def _stored_key(plan: SilverPlan, key: Iterable[Any], tokenize: Tokenize | None) -> dict[str, Any]:
+    """A business key as silver stores it: a restricted key column holds the token, so the world's clear value is
+    tokenised the way ingestion did before it is looked up."""
+    by_name = {c.name: c for c in plan.columns}
+    return {
+        k: tokenize(by_name[k].classification, str(v)) if tokenize and k in by_name and by_name[k].restricted else v
+        for k, v in zip(plan.keys, key, strict=True)
+    }
+
+
 def judge(
-    n: int, finding: dict[str, Any], tables: SilverTables, ps: dict[str, SilverPlan], day: SilverDay
+    n: int, finding: dict[str, Any], tables: SilverTables, ps: dict[str, SilverPlan], day: SilverDay,
+    tokenize: Tokenize | None = None,
 ) -> Verdict | None:
     det, ds = finding["detector"], finding["dataset"]
     if det not in SILVER_DETECTORS or ds not in ps:
@@ -102,15 +114,25 @@ def judge(
         return Verdict(n, finding["incident"], det, ds, "handled" if ok else "missed", evidence)
 
     if det == "DEL-01":
-        rows = [tables.versions(plan, dict(zip(plan.keys, k, strict=True))) for k in detail["keys"]]
+        rows = [tables.versions(plan, _stored_key(plan, k, tokenize)) for k in detail["keys"]]
         marked = sum(1 for r in rows if r and any(x["_is_current"] and x["_is_deleted"] for x in r))
         return v(marked == len(rows), f"{marked} of {len(rows)} deleted keys kept in silver and marked deleted")
+    if det == "SCD-02" and "field" in detail:  # a master record changed (a site put on hold): history gained a version
+        history = tables.versions(plan, _stored_key(plan, detail["key"], tokenize))
+        field_ = str(detail["field"])
+        current = [r for r in history if r["_is_current"]]
+        closed = [r for r in history if not r["_is_current"]]
+        ok = bool(current) and str(current[0][field_]) == str(detail["now"]) and any(
+            str(r[field_]) == str(detail["was"]) for r in closed)
+        return v(ok, f"{len(history)} versions; current {field_} {current[0][field_] if current else '?'}; closed "
+                     f"versions hold {sorted({str(r[field_]) for r in closed})}")
     if det == "SCD-02":
-        history = tables.versions(plan, dict(zip(plan.keys, detail["key"], strict=True)))
+        history = tables.versions(plan, _stored_key(plan, detail["key"], tokenize))
         current = [r for r in history if r["_is_current"]]
         placed = any(not r["_is_current"] and r["_seq_from"] == detail["older_seq"] for r in history)
-        now = str(current[0][_tracked_date(detail)]) if current else ""
-        ok = placed and now == str(detail["current_promised_date"])
+        tracked = _tracked_date(detail)
+        now = str(current[0][tracked]) if current else ""
+        ok = placed and now == str(detail[f"current_{tracked}"])
         return v(ok, f"{len(history)} versions; the late change (seq {detail['older_seq']}) "
                      f"{'is in history, not current' if placed else 'is missing or current'}; current value {now}")
     if det == "REC-05":
@@ -147,12 +169,13 @@ def silver_day(
     token_pattern: str,
     prefix: str = "silver",
     live: Callable[[str], list[Mapping[str, Any]] | None] | None = None,
+    tokenize: Tokenize | None = None,
 ) -> SilverDay:
     """One silver run for the day, then the live source against silver (REC-05, for datasets `live` can read), silver
     against the oracle and the day's silver incidents."""
     window = str(oracle["date"])
     report = build_silver(store, tables, stages, domain, env, f"{prefix}-{window}", window, token_pattern)
-    return judge_silver(n, oracle, report, store, tables, domain, token_pattern, live)
+    return judge_silver(n, oracle, report, store, tables, domain, token_pattern, live, tokenize)
 
 
 def judge_silver(
@@ -164,6 +187,7 @@ def judge_silver(
     domain: str,
     token_pattern: str,
     live: Callable[[str], list[Mapping[str, Any]] | None] | None = None,
+    tokenize: Tokenize | None = None,
 ) -> SilverDay:
     """The day's silver run judged from its report: the live source against silver, silver against the oracle and
     the day's silver incidents. The run itself may have happened in another process (a deployed silver job)."""
@@ -181,7 +205,7 @@ def judge_silver(
                                   {"source_rows": r.source_rows, "silver_rows": r.silver_rows,
                                    "missing": len(r.missing), "extra": len(r.extra)}, r.message()))
     for f in oracle.get("findings") or []:
-        verdict = judge(n, f, tables, ps, day)
+        verdict = judge(n, f, tables, ps, day, tokenize)
         if verdict is not None:
             day.verdicts.append(verdict)
     return day

@@ -241,12 +241,22 @@ def volume_problem(spec: Spec, batch: Batch, n: int) -> str:
     return ""
 
 
-def mass_delete_problem(spec: Spec, rows: list[Row], previous: set[tuple[Any, ...]] | None) -> str:
-    """A full copy that would delete more than the declared share of the last accepted copy's keys (DEL-04)."""
+def mass_delete_problem(spec: Spec, rows: list[Row], previous: set[tuple[Any, ...]] | None,
+                        tokenizer: Tokenizer | None = None) -> str:
+    """A full copy that would delete more than the declared share of the last accepted copy's keys (DEL-04).
+    `previous` holds the keys as stored (a restricted key column holds its token), so the copy's keys are compared as
+    stored too: with a `tokenizer`, a restricted key column is tokenised the way `protect` will."""
     limit = spec.load.get("mass_delete_max_share")
     if spec.read != "full_copy" or limit is None or not previous:
         return ""
-    now = {tuple(r[k] for k in spec.primary_key) for r in rows}
+    classes = {c.name: c.classification for c in spec.columns if c.classification in RESTRICTED}
+
+    def stored(r: Row, k: str) -> Any:
+        if tokenizer is not None and k in classes and r[k] not in (None, ""):
+            return tokenizer.token(classes[k], str(r[k]))
+        return r[k]
+
+    now = {tuple(stored(r, k) for k in spec.primary_key) for r in rows}
     gone = len(previous - now) / len(previous)
     if gone > float(limit):
         return (
@@ -330,7 +340,7 @@ def enter(batch: Batch, ctx: Ctx) -> Outcome:
     reason = volume_problem(spec, batch, len(rows))
     if reason:
         return _log(ctx, Outcome(batch, key, "rejected_volume", 0, reason))
-    reason = mass_delete_problem(spec, rows, ctx.previous_keys)
+    reason = mass_delete_problem(spec, rows, ctx.previous_keys, ctx.tokenizer)
     if reason:
         return _log(ctx, Outcome(batch, key, "held_mass_delete", 0, reason))
     tokens = protect(spec, rows, ctx.tokenizer)
