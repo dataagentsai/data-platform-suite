@@ -17,6 +17,7 @@ import urllib.request
 from collections.abc import Callable
 from typing import Any
 
+HTTP_OK = 200
 API = "https://api.powerbi.com/v1.0/myorg/groups/{workspace}/datasets/{dataset}/executeQueries"
 _HOLE = re.compile(r"\{\{\s*([a-z0-9_]+)\s*\}\}")
 _UUID = re.compile(r"^[0-9a-fA-F-]{36}$")
@@ -57,10 +58,10 @@ def run_pack(pack: list[dict[str, Any]], names: dict[str, str], workspace: str, 
         for i in range(repeats):
             t0 = clock()
             status, body = send(request(workspace, dataset, text, token))
-            rows = (((body.get("results") or [{}])[0].get("tables") or [{}])[0].get("rows") or []) if status == 200 else []
+            rows = (((body.get("results") or [{}])[0].get("tables") or [{}])[0].get("rows") or []) if status == HTTP_OK else []
             out.append({"query": q["id"], "case": q.get("case", ""), "run": i + 1, "cold": i == 0, "http": status,
                         "seconds": round(clock() - t0, 3), "rows_returned": len(rows),
-                        "error": "" if status == 200 else str(body.get("error", ""))[:300]})
+                        "error": "" if status == HTTP_OK else str(body.get("error", ""))[:300]})
     return out
 
 
@@ -76,7 +77,7 @@ def summary(results: list[dict[str, Any]]) -> dict[str, dict[str, float]]:
         by.setdefault(r["query"], []).append(r)
     out: dict[str, dict[str, float]] = {}
     for q, rows in sorted(by.items()):
-        warm = [r["seconds"] for r in rows if not r["cold"] and r["http"] == 200]
+        warm = [r["seconds"] for r in rows if not r["cold"] and r["http"] == HTTP_OK]
         out[q] = {"cold_s": next((r["seconds"] for r in rows if r["cold"]), 0.0), "warm_p50_s": percentile(warm, 50),
-                  "warm_p95_s": percentile(warm, 95), "failed": float(sum(r["http"] != 200 for r in rows))}
+                  "warm_p95_s": percentile(warm, 95), "failed": float(sum(r["http"] != HTTP_OK for r in rows))}
     return out

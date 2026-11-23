@@ -17,6 +17,11 @@ validate() {
 deploy() {
   mkdir -p "$ROOT/realms/databricks/engine/_catalog/slices"
   rsync -a --delete "$CATALOG/slices/$SLICE" "$ROOT/realms/databricks/engine/_catalog/slices/"
+  # SHAPE=<profile> also deploys a worst-case copy of the slice (benchmarking/scenarios/shapes.yaml) as <slice>-<profile>
+  if [ -n "${SHAPE:-}" ]; then
+    (cd "$HERE" && python3 -m bench.shapes --profile "$SHAPE" --src "$CATALOG/slices/$SLICE" --dst "_slices/$SLICE-$SHAPE")
+    rsync -a --delete "$HERE/_slices/$SLICE-$SHAPE" "$ROOT/realms/databricks/engine/_catalog/slices/"
+  fi
   (cd "$ROOT/realms/databricks/engine" && databricks bundle deploy -p "$PROFILE")
   (cd "$HERE/databricks" && databricks bundle deploy -p "$PROFILE")
 }
@@ -27,9 +32,10 @@ maintenance() {
   (cd "$HERE/databricks" && databricks bundle run bench_maintenance_s3tables -p "$PROFILE")
 }
 world() {
+  local run_slice="$SLICE${SHAPE:+-$SHAPE}"
   for f in "${FORMATS[@]}"; do
     (cd "$ROOT/realms/databricks/engine" && databricks bundle run engine_days -p "$PROFILE" \
-      --params "table_format=$f,days=$DAYS,scale=$SCALE")
+      --params "slice=$run_slice,table_format=$f,days=$DAYS,scale=$SCALE")
   done
 }
 case "$STEP" in

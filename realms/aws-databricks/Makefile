@@ -62,6 +62,9 @@ tf-validate:
 	done; done
 
 # ---------------------------------------------------------------------------- [account]
+# Your real account values live in infra/envs/<env>.local.tfvars (git-ignored, never committed); passed after the tracked file.
+LOCAL_VARS = $(if $(wildcard $(INFRA)/envs/$(ENV).local.tfvars),-var-file=../envs/$(ENV).local.tfvars)
+
 bootstrap:
 	aws s3api head-bucket --bucket $(STATE_BUCKET) 2>/dev/null || \
 		aws s3api create-bucket --bucket $(STATE_BUCKET) --region $(REGION) \
@@ -76,11 +79,11 @@ account:
 
 plan:
 	$(TF) -chdir=$(INFRA)/platform init -input=false -reconfigure -backend-config=../envs/$(ENV).backend.hcl
-	$(TF) -chdir=$(INFRA)/platform plan -input=false -var-file=../envs/$(ENV).tfvars
+	$(TF) -chdir=$(INFRA)/platform plan -input=false -var-file=../envs/$(ENV).tfvars $(LOCAL_VARS)
 
 infra:
 	$(TF) -chdir=$(INFRA)/platform init -input=false -reconfigure -backend-config=../envs/$(ENV).backend.hcl
-	$(TF) -chdir=$(INFRA)/platform apply -input=false -var-file=../envs/$(ENV).tfvars $(APPROVE)
+	$(TF) -chdir=$(INFRA)/platform apply -input=false -var-file=../envs/$(ENV).tfvars $(LOCAL_VARS) $(APPROVE)
 
 # The tasks read the spec catalog slice from beside the bundle; it is copied in before every deploy (git-ignored).
 catalog-copy:

@@ -30,10 +30,10 @@ HERE = Path(__file__).resolve().parent
 OPTIONS = {"home_url": "", "web_fonts": False}
 NAME = "Data Platform"
 MODULES = ["pages_start", "pages_map", "pages_meta", "pages_ingest", "pages_silver", "pages_silver_stages", "pages_silver_history",
-           "pages_gold", "pages_semantic", "pages_obs", "pages_tests", "pages_concerns"]
+           "pages_gold", "pages_semantic", "pages_obs", "pages_deploy", "pages_tests", "pages_concerns"]
 TABS = [("index", "Start"), ("map", "Code map"), ("concerns", "Concerns"), ("flow", "One day, end to end"), ("meta", "Metadata store"), ("ingest", "Ingestion"),
         ("silver", "Bronze to silver"), ("gold", "Silver to gold"), ("semantic", "Semantic"), ("obs", "Operations"),
-        ("tests", "Tests and proof")]
+        ("deploy", "Deploy"), ("tests", "Tests and proof")]
 # Words that must never appear on a page: kept in a file outside the repository, so they are not shipped with it.
 _WORDS = os.environ.get("EXPLAINER_FORBIDDEN_FILE")
 FORBIDDEN = Path(_WORDS).expanduser().read_text().strip() if _WORDS else ""

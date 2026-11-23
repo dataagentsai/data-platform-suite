@@ -193,3 +193,32 @@ def test_the_shipped_query_pack_needs_only_the_listed_names():
     assert used <= needed
     assert all(q["case"] in {c["id"] for c in plan.load(ROOT / "scenarios/powerbi_worst_cases.yaml")["cases"]}
                for q in pack["queries"])
+
+
+@pytest.mark.parametrize("bad", ["a b", "t;drop table x", "`t`; --", ""])
+def test_file_count_and_timing_refuse_unsafe_names(bad):
+    with pytest.raises(ValueError, match="not a usable name"):
+        maintenance.count_files(FakeSpark(), bad, "iceberg-uc")
+    with pytest.raises(ValueError, match="not a usable name"):
+        maintenance.timed_query(FakeSpark(), bad)
+
+
+@pytest.mark.parametrize(
+    ("case", "values", "expect"),
+    [
+        ("the whole word", [10, 50, 95], [10, 50, 95]),
+        ("one value", [7], [7, 7, 7]),
+        ("none", [], [0.0, 0.0, 0.0]),
+    ],
+)
+def test_percentile(case, values, expect):
+    assert [dax.percentile(values, p) for p in (0, 50, 100)][0] == expect[0]
+    assert dax.percentile(values, 100) == (max(values) if values else 0.0)
+
+
+def test_applies_and_expand_pure_helpers():
+    p = maintenance.Probe("M-99", "x", ("SELECT 1",), ("s3tables",))
+    assert maintenance.applies(p, "s3tables") and not maintenance.applies(p, "iceberg-uc")
+    runs = plan.expand(PB, MT, ("iceberg-uc",), days=2, scale=0.5, case_profiles={"PB-01": "scd2_deep"})
+    assert {r["world"]["shape"] for r in runs if r["kind"] == "powerbi"} == {"scd2_deep"}
+    assert {r["world"]["days"] for r in runs} == {2}

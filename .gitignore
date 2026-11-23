@@ -27,3 +27,12 @@ target/
 realms/databricks/engine/_catalog/
 realms/databricks/v1/_catalog/
 realms/aws-databricks/bundle/_catalog/
+benchmarking/_slices/
+
+# keys and local values never go in git (preflight S1 checks these)
+*.local.tfvars
+*.pem
+*.tfstate
+*.tfstate.*
+.databricks/
+results/

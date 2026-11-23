@@ -42,6 +42,17 @@ CLASSES = [
 DEFECTS = [f"DF{i:02d}" for i in range(1, 13)]
 
 
+# Optional `stress:` block of the world file: shapes that make the data harder (benchmarking/, worst cases). Every default
+# is what the world did before the block existed, so a world without it produces the same data and the same oracle.
+STRESS_DEFAULTS: dict[str, float] = {
+    "dealers_multiplier": 1,  # more distinct dealers: higher key cardinality
+    "materials_multiplier": 1,  # more distinct materials
+    "dealer_skew_alpha": 1.2,  # Pareto shape of the dealers' share of orders: lower = a few dealers dominate more
+    "dealer_weight_cap": 20.0,  # the largest dealer weight
+    "material_revisions_per_day": 2,  # materials revised each day after the first: deepens SCD2 history
+}
+
+
 class Line:
     """One sales order line: its current source row plus the truth the oracle needs."""
 
@@ -90,6 +101,11 @@ class TyreCompany:
     def __init__(self, dwd: Dwd, scale: float = 1.0):
         w = dwd.world
         self.dwd, self.scale, self.pop = dwd, scale, w["population"]
+        given = w.get("stress") or {}
+        unknown = sorted(set(given) - set(STRESS_DEFAULTS))
+        if unknown:
+            raise ValueError(f"unknown stress setting {unknown}; known: {sorted(STRESS_DEFAULTS)}")
+        self.stress = {**STRESS_DEFAULTS, **given}
         self.sys = {name: ds.system for name, ds in dwd.datasets.items()}
         self.clock = SimClock(str(w["clock"]["start"]), w["clock"]["business_timezone"])
         self.plants = {code: {**p, "tz": ZoneInfo(p["timezone"])} for code, p in w["clock"]["plants"].items()}
@@ -124,16 +140,17 @@ class TyreCompany:
     # ------------------------------------------------------------------ population
     def _make_population(self) -> None:
         r = self.rng["master"]
-        n_dealers = int(self.pop["dealers"])
+        n_dealers = int(self.pop["dealers"] * self.stress["dealers_multiplier"])
         self.dealers: dict[str, Row] = {}
         self.dealer_weight: dict[str, float] = {}
         for i in range(1, n_dealers + 1):
             code = f"D-{i:04d}"
             self.dealers[code] = self._dealer_row(code, REGIONS[(i - 1) % len(REGIONS)], r)
-            self.dealer_weight[code] = min(r.paretovariate(1.2), 20.0)
+            self.dealer_weight[code] = min(r.paretovariate(self.stress["dealer_skew_alpha"]),
+                                           self.stress["dealer_weight_cap"])
         self.materials: dict[str, Row] = {}
         self.price: dict[str, float] = {}
-        for i in range(1, int(self.pop["materials"]) + 1):
+        for i in range(1, int(self.pop["materials"] * self.stress["materials_multiplier"]) + 1):
             cls, _, rims, (lo, hi) = r.choices(CLASSES, weights=[c[1] for c in CLASSES])[0]
             code = f"MAT-{i:05d}"
             rim = r.choice(rims)
@@ -217,7 +234,8 @@ class TyreCompany:
     def _masters(self, d: int, e: Emission) -> None:
         r, change_at = self.rng["master"], self.clock.at(d, 0, 20)
         mat_changes = []
-        for code in r.sample(sorted(self.materials), 2) if d > 1 else []:
+        revisions = min(int(self.stress["material_revisions_per_day"]), len(self.materials))
+        for code in r.sample(sorted(self.materials), revisions) if d > 1 else []:
             self.materials[code]["description"] += " (revised)"
             mat_changes.append(
                 SourceChange("U", {**self.materials[code], "extracted_at": iso(change_at)}, 0, iso(change_at))

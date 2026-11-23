@@ -55,7 +55,7 @@ def problems(powerbi: dict[str, Any], maintenance: dict[str, Any]) -> list[str]:
 
 
 def expand(powerbi: dict[str, Any], maintenance: dict[str, Any], formats: tuple[str, ...] = FORMATS,
-           days: int = 3, scale: float = 0.1) -> list[dict[str, Any]]:
+           days: int = 3, scale: float = 0.1, case_profiles: dict[str, str] | None = None) -> list[dict[str, Any]]:
     """One entry per (case or operation, format, mode). The world settings (days, scale) are the same for every entry
     of a plan; the benchmark raises scale on the office workspace."""
     runs: list[dict[str, Any]] = []
@@ -64,7 +64,8 @@ def expand(powerbi: dict[str, Any], maintenance: dict[str, Any], formats: tuple[
             for mode in c["modes"]:
                 runs.append({"id": f"{c['id']}:{fmt}:{mode}", "kind": "powerbi", "case": c["id"], "format": fmt,
                              "mode": mode, "data_shape": c["data_shape"], "pass_if": c["pass_if"],
-                             "world": {"days": days, "scale": scale}})
+                             "world": {"days": days, "scale": scale,
+                                       "shape": (case_profiles or {}).get(c["id"], "baseline")}})
         for op in maintenance["operations"]:
             runs.append({"id": f"{op['id']}:{fmt}", "kind": "maintenance", "operation": op["id"], "format": fmt,
                          "measure": op["measure"], "world": {"days": days, "scale": scale}})
@@ -87,7 +88,12 @@ def main(argv: list[str] | None = None) -> int:
     if a.check:
         print("scenario files are valid")
         return 0
-    runs = expand(pb, mt, tuple(a.format or FORMATS), a.days, a.scale)
+    shapes = load(HERE / "scenarios/shapes.yaml")
+    unknown = sorted(set(shapes["case_profiles"].values()) - set(shapes["profiles"]))
+    if unknown:
+        print(f"case_profiles name unknown profiles {unknown}", file=sys.stderr)
+        return 1
+    runs = expand(pb, mt, tuple(a.format or FORMATS), a.days, a.scale, shapes["case_profiles"])
     text = json.dumps(runs, indent=2)
     if a.out:
         a.out.write_text(text + "\n")

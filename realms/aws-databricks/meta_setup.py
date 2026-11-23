@@ -65,18 +65,37 @@ def wake(instance: str) -> None:
         say(f"enabled the disabled endpoint {endpoint}")
 
 
+def binding_settings(manifest: Path, chosen: dict[str, str | None]) -> dict[str, dict[str, str]]:
+    """{"source.dataset": {key: value}} for every dataset file of the manifest: the settings the caller chose (a None is
+    left out), added on top of the manifest by the loader. Empty when nothing was chosen."""
+    import yaml  # noqa: PLC0415 -- only this command needs it
+
+    values = {k: v for k, v in chosen.items() if v}
+    if not values:
+        return {}
+    out: dict[str, dict[str, str]] = {}
+    for f in sorted((manifest / "datasets").glob("*.yaml")):
+        d = yaml.safe_load(f.read_text())
+        out[f"{d['source_name']}.{d['dataset_name']}"] = dict(values)
+    return out
+
+
 def main() -> int:
     p = argparse.ArgumentParser()
     p.add_argument("--instance", required=True)
     p.add_argument("--database", default="dp_meta")
     p.add_argument("--manifest", type=Path, required=True)
+    p.add_argument("--table-format", choices=["iceberg-uc", "delta-uc-uniform", "s3tables"],
+                   help="record this table format on every dataset (a binding-level setting, in the run's fingerprint)")
+    p.add_argument("--silver-engine", choices=["job", "declarative"], help="record this silver engine on every dataset")
     a = p.parse_args()
 
     wake(a.instance)
     meta_dsn = dsn(a.instance, a.database)
     os.environ["PGPASSWORD"] = token(a.instance)  # libpq reads it; lives only in this process
     store = PostgresMetaStore.connect(meta_dsn, create=True, install_schema=True)
-    report = load(store, a.manifest.expanduser())
+    report = load(store, a.manifest.expanduser(), extra_settings=binding_settings(
+        a.manifest.expanduser(), {"table_format": a.table_format, "silver_engine": a.silver_engine}))
     say(f"loaded domain {report.domain}: {len(report.loaded)} datasets; warnings {len(report.warnings)}; "
           f"in store but not in manifest {report.not_in_manifest}")
     for w in report.warnings:

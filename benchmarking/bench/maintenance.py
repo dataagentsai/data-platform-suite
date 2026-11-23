@@ -51,16 +51,22 @@ def applies(p: Probe, fmt: str) -> bool:
     return p.formats is None or fmt in p.formats
 
 
+def checked(name: str) -> str:
+    """A table, namespace or catalog name that is safe to put in a statement: plain or backtick-quoted dotted identifiers."""
+    if not _SAFE.match(name):
+        raise ValueError(f"not a usable name: {name!r}")
+    return name
+
+
 def render(statement: str, table: str, ident: str, catalog: str) -> str:
     """Fill a statement. The names come from the platform's own store (checked identifiers), never from outside."""
-    for part in (table, ident, catalog):
-        if not _SAFE.match(part):
-            raise ValueError(f"not a usable name: {part!r}")
-    return statement.format(t=table, ident=ident, catalog=catalog)
+    return statement.format(t=checked(table), ident=checked(ident), catalog=checked(catalog))
 
 
 def count_files(spark: Any, table: str, fmt: str) -> int | None:
     """Data files in the table now (None if the format will not say)."""
+    table = checked(table)
+    # shiftleft: allow SL-SEC-01 -- the table name passed checked(): identifier characters only, no values
     sql = f"DESCRIBE DETAIL {table}" if fmt != "s3tables" else f"SELECT count(*) AS n FROM {table}.files"
     try:
         row = spark.sql(sql).first()
@@ -71,8 +77,10 @@ def count_files(spark: Any, table: str, fmt: str) -> int | None:
 
 def timed_query(spark: Any, table: str) -> float | None:
     """Seconds for one scan with an aggregate: the stand-in for a report query."""
+    table = checked(table)
     t0 = time.monotonic()
     try:
+        # shiftleft: allow SL-SEC-01 -- the table name passed checked(): identifier characters only, no values
         spark.sql(f"SELECT count(*), sum(v), count(DISTINCT k) FROM {table}").collect()
     except Exception:  # noqa: BLE001 -- recorded as None
         return None

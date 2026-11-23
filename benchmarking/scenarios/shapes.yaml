@@ -1,0 +1,32 @@
+# Worst-case data shapes: named settings of the tyre world's `stress:` block (src/dataplatform/world/domains/tyre.py,
+# STRESS_DEFAULTS). A profile changes only what it names; everything else stays as the world file says. The data is
+# generated on the office workspace: `python -m bench.shapes` only writes a copy of the slice whose world file carries
+# the profile, and the engine job runs that slice.
+version: 0
+profiles:
+  baseline: {}
+  skew_heavy:             # a handful of dealers send most orders: skewed joins, hot keys, uneven partitions
+    dealer_skew_alpha: 0.8
+    dealer_weight_cap: 200.0
+  cardinality_max:        # many distinct dealers and materials: high-cardinality visuals and slicers
+    dealers_multiplier: 20
+    materials_multiplier: 20
+  scd2_deep:              # few materials revised every day: long history per key, hard point-in-time joins
+    materials_multiplier: 0.1
+    material_revisions_per_day: 40
+  worst_combined:         # all of the above at once
+    dealer_skew_alpha: 0.8
+    dealer_weight_cap: 200.0
+    dealers_multiplier: 20
+    materials_multiplier: 5
+    material_revisions_per_day: 40
+# Which profile each Power BI case needs (cases not listed use baseline). Volume is the engine job's `scale`, not a profile.
+case_profiles:
+  PB-01: worst_combined
+  PB-02: worst_combined
+  PB-03: cardinality_max
+  PB-04: skew_heavy
+  PB-05: scd2_deep
+  PB-07: worst_combined
+  PB-08: worst_combined
+  PB-13: worst_combined
