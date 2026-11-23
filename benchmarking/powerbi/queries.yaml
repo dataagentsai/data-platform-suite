@@ -1,0 +1,25 @@
+# Power BI query pack (templates). Run with benchmarking/bench/dax.py against the published semantic model.
+# {{name}} marks a table or column of YOUR model; give the values in a JSON file (see README). The queries are the
+# ones the worst cases need: a plain count, a high-cardinality table, a dimension chain, a distinct count, a
+# time-intelligence measure and a filtered slice. Adjust the DAX to the model before the real run.
+version: 0
+names_needed: [fact, fact_key, fact_amount, fact_date, dim, dim_key, dim_name, dim_group, date_table, date_col]
+queries:
+  - id: Q01-rowcount
+    case: PB-02
+    dax: "EVALUATE ROW(\"rows\", COUNTROWS('{{fact}}'))"
+  - id: Q02-high-cardinality
+    case: PB-03
+    dax: "EVALUATE TOPN(1000, SUMMARIZECOLUMNS('{{fact}}'[{{fact_key}}], \"total\", SUM('{{fact}}'[{{fact_amount}}])), [total], DESC)"
+  - id: Q03-dimension-group
+    case: PB-04
+    dax: "EVALUATE SUMMARIZECOLUMNS('{{dim}}'[{{dim_group}}], \"total\", SUM('{{fact}}'[{{fact_amount}}]))"
+  - id: Q04-distinct-count
+    case: PB-08
+    dax: "EVALUATE ROW(\"distinct\", DISTINCTCOUNT('{{fact}}'[{{fact_key}}]))"
+  - id: Q05-year-to-date
+    case: PB-08
+    dax: "EVALUATE ROW(\"ytd\", CALCULATE(SUM('{{fact}}'[{{fact_amount}}]), DATESYTD('{{date_table}}'[{{date_col}}])))"
+  - id: Q06-one-dimension-member
+    case: PB-05
+    dax: "EVALUATE ROW(\"total\", CALCULATE(SUM('{{fact}}'[{{fact_amount}}]), '{{dim}}'[{{dim_name}}] = \"A\"))"

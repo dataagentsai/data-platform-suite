@@ -1,0 +1,93 @@
+# Power BI worst cases (user, 23 Nov: "power BI is important, worst case scenarios").
+# One case = what makes it hard, how the data is shaped to cause it, what is measured, and when it fails.
+# status: designed (this file) -> built (generator + runner can produce it) -> run (a result file exists).
+version: 0
+connection_modes: [import, directquery, composite]      # direct_lake optional, needs Fabric
+metrics_every_case: [time_to_first_visual_s, query_p50_s, query_p95_s, query_p99_s, refresh_duration_s,
+                     warehouse_dbu, failed_queries, wrong_numbers_vs_oracle]
+cases:
+  - id: PB-01
+    name: Full import refresh of the largest fact, no incremental refresh
+    hard_because: The whole fact is read and compressed again every refresh; memory and the refresh time limit are hit.
+    data_shape: {fact_rows: scale_max, columns_wide: 60, high_cardinality_keys: 3}
+    modes: [import]
+    pass_if: refresh finishes inside the service limit with memory headroom
+  - id: PB-02
+    name: DirectQuery on the largest fact, cold SQL warehouse
+    hard_because: The first query pays warehouse start-up, then scans a fact with no useful layout.
+    data_shape: {fact_rows: scale_max, small_files: many, clustering: none}
+    modes: [directquery]
+    pass_if: time_to_first_visual under the agreed target after a cold start
+  - id: PB-03
+    name: Visual with a very high-cardinality field
+    hard_because: A table or slicer over a key with millions of distinct values (dealer x product x day).
+    data_shape: {distinct_dealer_product_day: 10_000_000, zipf_skew: 1.2}
+    modes: [import, directquery]
+    pass_if: visual renders; no query is cut off
+  - id: PB-04
+    name: Snowflake and many-to-many relationships, both-way filters
+    hard_because: The engine must resolve chains of dimensions and bridge tables on every click.
+    data_shape: {dimension_chain_depth: 4, bridge_rows: 5_000_000}
+    modes: [import, directquery, composite]
+    pass_if: numbers equal the oracle and p95 stays inside the target
+  - id: PB-05
+    name: Point-in-time join on a dimension with deep SCD2 history
+    hard_because: Each fact row must find the dimension version valid at its date; versions per key are many.
+    data_shape: {scd2_versions_per_key: 200, late_arriving_dimension_pct: 5}
+    modes: [directquery, composite]
+    pass_if: no fact row lands on the wrong version (checked against the oracle)
+  - id: PB-06
+    name: Row-level security with many roles and a large security table
+    hard_because: Every query carries a filter built from a big mapping table; platform-side and report-side rules differ.
+    data_shape: {roles: 500, users: 20_000, mapping_rows: 2_000_000}
+    modes: [import, directquery]
+    compare: [report_level_rls, uc_row_filter, uc_abac_policy]
+    pass_if: each user sees only their rows, and the three ways give the same rows
+  - id: PB-07
+    name: Concurrent users on one report
+    hard_because: Many users each click several visuals at once; the warehouse queues or scales.
+    data_shape: {concurrent_users: [10, 50, 200], clicks_per_user: 20}
+    modes: [directquery, composite]
+    pass_if: p95 grows slowly with users; no query fails; cost per user is recorded
+  - id: PB-08
+    name: Heavy DAX over the big fact (distinct count, time intelligence, iterators)
+    hard_because: Measures that cannot be pushed down are computed row by row in the engine.
+    data_shape: {fact_rows: scale_max}
+    modes: [import, directquery]
+    pass_if: measure value equals the oracle; the slow measures are named with their time
+  - id: PB-09
+    name: Composite model with aggregation tables that do not match the query
+    hard_because: A query that misses the aggregate silently falls through to the detail table.
+    data_shape: {agg_grain: month, query_grain: day}
+    modes: [composite]
+    pass_if: the miss is detected and its cost is recorded
+  - id: PB-10
+    name: Metric view answer versus the Power BI measure
+    hard_because: The same business number is defined twice (platform semantic layer and the report) and can drift.
+    data_shape: {known_answers: manifest}
+    modes: [import, directquery]
+    pass_if: both equal the manifest's known answers
+  - id: PB-11
+    name: Freshness, source change to visible change in the report
+    hard_because: The delay is the sum of every hop plus the report's own refresh or cache.
+    data_shape: {changes_per_hop: 1}
+    modes: [import, directquery]
+    pass_if: end-to-end seconds per hop are recorded as a waterfall
+  - id: PB-12
+    name: Restatement after a correction
+    hard_because: A corrected old value must change gold and the report, and nothing else.
+    data_shape: {corrections: 50, window: 1_month_back}
+    modes: [import, directquery]
+    pass_if: report equals the oracle after the correction, before it equals the old value
+  - id: PB-13
+    name: Neglected tables (no maintenance for N days)
+    hard_because: Small files, many snapshots and stale statistics slow every query and refresh.
+    data_shape: {days_without_maintenance: [0, 3, 14], small_file_ratio: high}
+    modes: [import, directquery]
+    pass_if: slowdown versus a maintained table is measured per format
+  - id: PB-14
+    name: Schema change in the middle of the run
+    hard_because: A new or changed column can break the semantic model or the refresh.
+    data_shape: {added_columns: 2, widened_type: 1}
+    modes: [import, directquery]
+    pass_if: the failure, if any, is caught before users see wrong numbers

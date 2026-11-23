@@ -1,0 +1,87 @@
+# The benchmark's Databricks jobs (office workspace). The world itself is run by the engine bundle's `engine_days` job
+# with `table_format` and `scale` parameters (realms/databricks/engine); this bundle adds the maintenance probe.
+#
+#   cd benchmarking/databricks && databricks bundle deploy -p <profile>
+#   databricks bundle run bench_maintenance -p <profile> --params table_format=iceberg-uc
+#   databricks bundle run bench_maintenance -p <profile> --params table_format=delta-uc-uniform
+#   (S3 Tables needs a classic cluster with its catalog: bench_maintenance_s3tables, see variables below)
+bundle:
+  name: dp_bench
+
+variables:
+  env:
+    default: dev
+  s3tables_arn:
+    description: ARN of the S3 Tables table bucket (arn:aws:s3tables:<region>:<account>:bucket/<name>)
+    default: ""
+  spark_version:
+    default: "16.4.x-scala2.12"
+  node_type:
+    default: "i3.xlarge"
+  # versions are the ones the platform was written against; confirm them against the workspace's runtime
+  iceberg_runtime:
+    default: "org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.9.2"
+  s3tables_catalog_jar:
+    default: "software.amazon.s3tables:s3-tables-catalog-for-iceberg-runtime:0.1.5"
+
+sync:
+  paths:
+    - ../../src/dataplatform
+    - ../bench
+    - .
+
+targets:
+  dev:
+    default: true
+    mode: development
+
+resources:
+  jobs:
+    bench_maintenance:
+      name: dp-${var.env}-bench-maintenance
+      max_concurrent_runs: 1
+      parameters:
+        - name: table_format
+          default: "iceberg-uc"
+        - name: commits
+          default: "200"
+      environments:
+        - environment_key: default
+          spec:
+            environment_version: "3"
+            dependencies: ["pyyaml>=6"]
+      tasks:
+        - task_key: probe
+          environment_key: default
+          spark_python_task:
+            python_file: ./tasks/maintenance_probe.py
+            parameters: [--table-format, "{{job.parameters.table_format}}", --commits, "{{job.parameters.commits}}",
+                         --env, "${var.env}", --run-id, "{{job.run_id}}", --root, "${workspace.file_path}"]
+
+    bench_maintenance_s3tables:
+      name: dp-${var.env}-bench-maintenance-s3tables
+      max_concurrent_runs: 1
+      job_clusters:
+        - job_cluster_key: s3t
+          new_cluster:
+            spark_version: ${var.spark_version}
+            node_type_id: ${var.node_type}
+            num_workers: 1
+            data_security_mode: SINGLE_USER
+            spark_conf:
+              spark.sql.extensions: org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions
+              spark.sql.catalog.s3t: org.apache.iceberg.spark.SparkCatalog
+              spark.sql.catalog.s3t.catalog-impl: software.amazon.s3tables.iceberg.S3TablesCatalog
+              spark.sql.catalog.s3t.warehouse: ${var.s3tables_arn}
+              spark.sql.catalog.s3t.cache-enabled: "false"
+      tasks:
+        - task_key: probe
+          job_cluster_key: s3t
+          libraries:
+            - maven: {coordinates: "${var.iceberg_runtime}"}
+            - maven: {coordinates: "${var.s3tables_catalog_jar}"}
+            - pypi: {package: "pyyaml"}
+          spark_python_task:
+            python_file: ./tasks/maintenance_probe.py
+            parameters: [--table-format, s3tables, --env, "${var.env}", --run-id, "{{job.run_id}}",
+                         --root, "${workspace.file_path}"]

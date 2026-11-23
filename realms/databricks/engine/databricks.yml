@@ -61,6 +61,10 @@ resources:
           default: "compressed"
         - name: housekeeping_days  # bronze housekeeping's correction window (B8); 1 on the compressed loop; "" = off
           default: "1"
+        - name: table_format    # iceberg-uc (UC managed Iceberg) | delta-uc-uniform (managed Delta + UniForm); s3tables needs a classic cluster with the S3 Tables catalog
+          default: "iceberg-uc"
+        - name: scale           # the world's size; 0.1 is the 3-day dev loop, the benchmark raises it
+          default: "0.1"
       environments:
         - environment_key: default
           spec:
@@ -74,5 +78,7 @@ resources:
           spark_python_task:
             python_file: ./tasks/run_days.py
             parameters: [--slice, "{{job.parameters.slice}}", --days, "{{job.parameters.days}}", --calendar, "{{job.parameters.calendar}}",
-                         --housekeeping-days, "{{job.parameters.housekeeping_days}}", --env, "${var.env}", --meta-instance,
+                         --housekeeping-days, "{{job.parameters.housekeeping_days}}",
+                         --table-format, "{{job.parameters.table_format}}", --scale, "{{job.parameters.scale}}",
+                         --env, "${var.env}", --meta-instance,
                          "${var.meta_instance}", --run-id, "{{job.run_id}}", --root, "${workspace.file_path}"]

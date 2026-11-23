@@ -16,6 +16,8 @@ p.add_argument("--days", default="3")
 p.add_argument("--scale", default="0.1")
 p.add_argument("--calendar", default="", help="a named world calendar; empty = the world's own")
 p.add_argument("--housekeeping-days", default="", help="bronze housekeeping's correction window; empty = off")
+p.add_argument("--table-format", default="iceberg-uc", choices=["iceberg-uc", "delta-uc-uniform", "s3tables"],
+               help="the table format of every layer (the table port, ADR-027)")
 p.add_argument("--env", default="dev")
 p.add_argument("--meta-instance", default="dp-meta-dev")
 p.add_argument("--run-id", default="manual")
@@ -29,7 +31,7 @@ os.environ.update(DP_CATALOG=str(catalog), DP_META_INSTANCE=a.meta_instance, DP_
                   DP_TOKEN_KEY=secrets.token_hex(32))  # a fresh key per proof run, never stored
 out = Path(f"/tmp/dp-proof-{a.run_id}")
 sys.argv = ["run_platform.py", "--slice", a.slice, "--days", a.days, "--scale", a.scale, "--db", "sqlite", "--meta", "lakebase",
-            "--spark", "existing", "--table-format", "iceberg-uc", "--env", a.env, "--upkeep-every", "7", "--reset-tables",
+            "--spark", "existing", "--table-format", a.table_format, "--env", a.env, "--upkeep-every", "7", "--reset-tables",
             "--out", str(out), *(["--calendar", a.calendar] if a.calendar else []),
             *(["--housekeeping-days", a.housekeeping_days, "--prove-rebuild"] if a.housekeeping_days else [])]
 code = 0

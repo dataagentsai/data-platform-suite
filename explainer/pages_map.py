@@ -284,10 +284,21 @@ def orchestration():
         ["One process per hop", "<code>run_platform.py --hops process</code>", f"Each hop is its own process: {fn('P/scripts/run_hop.py', 'main')}", "Proving that each hop works as a deployed job task would, alone"],
         ["Deployed job", "The Databricks job <code>dp-&lt;env&gt;-engine-days</code>", "One task runs the inline loop on the job's own Spark", "The 3-day and 14-day proofs on Databricks"],
     ])
+    out += "<h2>The way into each layer</h2>"
+    out += table(["Layer", "The function that starts it", "Started inline by", "Started alone by"], [
+        ["Landing to bronze (ingestion)", fn(P + "ingest/runner.py", "ingest"), "the day loop, once per day", "<code>run_hop.py --hop ingest</code>"],
+        ["Bronze to silver", fn(P + "silver/runner.py", "build_silver"), "the day loop's silver hook", "<code>run_hop.py --hop silver</code>"],
+        ["Silver to gold", fn(P + "gold/harness.py", "run_gold"), "the day loop's gold hook", "<code>run_hop.py --hop gold</code>"],
+        ["Gold to semantic", fn(P + "semantic/answers.py", "answers"), "the checks at the end of each day", "no entry of its own yet"],
+    ])
+    out += (f"<p>The same list, with who calls each one found by reading the code, is on {link('map')}. Every layer reads and "
+            "writes its tables through the table port, so the table format (Unity Catalog managed Iceberg, managed Delta with "
+            "UniForm, or AWS S3 Tables) is a job parameter and not a change to any layer's code.</p>")
     out += "<h2>The job definition</h2>"
     out += code("P/realms/databricks/engine/databricks.yml", r"^    engine_days:", r"\"\$\{var.meta_instance\}\", --run-id", "The deployed job: a few parameters and one task.", cap=40)
-    out += ("<p>There is one task. The job's parameters are the number of days, the name of the world calendar, and how long bronze "
-            "is kept before housekeeping. The task passes them to <code>run_days.py</code>, which sets its environment and runs "
+    out += ("<p>There is one task. The job's parameters are the slice (which company's world), the number of days, the world's "
+            "size (<code>scale</code>), the name of the world calendar, how long bronze is kept before housekeeping, and the "
+            "table format of every layer. The task passes them to <code>run_days.py</code>, which sets its environment and runs "
             "<code>run_platform.py</code> inside the job. When the loop ends it copies the operations page and the report to a "
             "volume and publishes the operations tables.</p>")
     out += code("P/realms/databricks/engine/tasks/run_days.py", r"^sys.argv = \[", r"^code = 0", "How the task turns the job's options into the day loop's options.", cap=12)
@@ -314,7 +325,14 @@ def orchestration():
         "The platform job with three tasks (ingestion, silver, gold) that <code>--hops job</code> expects is not defined in this snapshot, so that way has not been shown here.",
         "Retries are Databricks' job setting plus our source guard for pulls. There is no retry of a failed hop by our code.",
         "A rule that jobs wait for their data and not for the clock (ORCH-01) is written in code comments but has no test.",
+        "Datasets are not grouped. One daily job loads every dataset of a domain. Many datasets per source would want a "
+        "data group, with one job per group and dependencies between groups. That is planned, not built.",
+        "Whether a job runs on serverless or on a cluster is set in the bundle file, not in the manifest. A per-group "
+        "setting is planned.",
     ])
+    out += ("<p>The benchmark has its own jobs and a deploy script (the <code>benchmarking</code> folder): one that probes table "
+            "maintenance in each format, and the same <code>engine_days</code> job run per format with a larger "
+            "<code>scale</code>.</p>")
     return out
 
 

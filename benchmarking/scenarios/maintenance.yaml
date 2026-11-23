@@ -1,0 +1,82 @@
+# Table maintenance across the three formats (user, 23 Nov: "with all 3 formats how would you do table maintenance;
+# is all table maintenance of Databricks supported; I want to check that").
+#
+# EVERY cell below is unverified: it is what the platform's code does today or what the vendor documents, written from
+# memory. A cell becomes verified only when its case in this file has run in the office workspace and the result file
+# says so. The platform's own code today: UC managed Iceberg and Delta+UniForm run OPTIMIZE; S3 Tables reports
+# "managed" and does nothing (adapters/table_store.py upkeep).
+version: 0
+formats: [uc_managed_iceberg, uc_managed_delta_uniform, aws_s3_tables]
+operations:
+  - id: M-01
+    operation: Compact small files
+    ask: Does it exist, who runs it (automatic or us), and how long does it take on a fragmented table?
+    expect:
+      uc_managed_iceberg: {owner: "platform or us", our_command: "OPTIMIZE", status: unverified}
+      uc_managed_delta_uniform: {owner: "platform or us", our_command: "OPTIMIZE", status: unverified}
+      aws_s3_tables: {owner: "AWS (automatic compaction setting)", our_command: "none", status: unverified}
+    measure: [files_before, files_after, duration_s, query_p95_before_s, query_p95_after_s]
+  - id: M-02
+    operation: Expire old versions or snapshots and delete unreferenced files
+    ask: Can we set retention, does the table keep time travel for the days we need, is storage released?
+    expect:
+      uc_managed_iceberg: {owner: unknown, our_command: "VACUUM or snapshot expiry (to find out)", status: unverified}
+      uc_managed_delta_uniform: {owner: "platform or us", our_command: "VACUUM", status: unverified}
+      aws_s3_tables: {owner: "AWS (snapshot management setting)", our_command: "none", status: unverified}
+    measure: [snapshots_before, snapshots_after, storage_bytes_before, storage_bytes_after, time_travel_still_works]
+  - id: M-03
+    operation: Layout (clustering or sorting) for the columns reports filter on
+    ask: Is liquid clustering allowed with each format's version and properties, and does it change query time?
+    expect:
+      uc_managed_iceberg: {note: "needs v3, or v2 with deletion vectors and row tracking off (13 Nov probe)", status: unverified}
+      uc_managed_delta_uniform: {note: "not probed together with UniForm", status: unverified}
+      aws_s3_tables: {note: "no liquid clustering; sort order by compaction strategy, to check", status: unverified}
+    measure: [create_ok, query_p95_clustered_s, query_p95_unclustered_s]
+  - id: M-04
+    operation: Statistics for the optimiser
+    ask: Are column statistics kept up to date automatically, and what happens after a big load?
+    expect:
+      uc_managed_iceberg: {status: unverified}
+      uc_managed_delta_uniform: {our_command: "ANALYZE TABLE", status: unverified}
+      aws_s3_tables: {note: "engine side only", status: unverified}
+    measure: [stats_present, plan_changed, query_p95_s]
+  - id: M-05
+    operation: Automatic maintenance (predictive optimization)
+    ask: Which of the three formats are covered, how soon after a load does it run, what does it cost?
+    expect:
+      uc_managed_iceberg: {status: unverified}
+      uc_managed_delta_uniform: {status: unverified}
+      aws_s3_tables: {note: "not applicable: AWS's own maintenance", status: unverified}
+    measure: [ran, delay_after_load_s, dbu_or_cost]
+  - id: M-06
+    operation: Row-level deletes and deletion vectors
+    ask: After privacy deletes, are the rows physically gone, and how do we purge them?
+    expect:
+      uc_managed_iceberg: {status: unverified}
+      uc_managed_delta_uniform: {note: "UniForm V2 needs deletion vectors off (to check)", status: unverified}
+      aws_s3_tables: {status: unverified}
+    measure: [rows_deleted, files_still_holding_rows, purge_command_works]
+  - id: M-07
+    operation: UniForm metadata lag (Delta table read as Iceberg)
+    ask: How long after a write does an Iceberg reader see it, and can it be wrong?
+    expect:
+      uc_managed_iceberg: {note: "not applicable", status: unverified}
+      uc_managed_delta_uniform: {status: unverified}
+      aws_s3_tables: {note: "not applicable", status: unverified}
+    measure: [lag_s_p50, lag_s_p95, reads_stale_count]
+  - id: M-08
+    operation: Metadata and manifest upkeep (many small commits)
+    ask: After 96 commits a day for 14 days, does the metadata slow planning, and what fixes it?
+    expect:
+      uc_managed_iceberg: {status: unverified}
+      uc_managed_delta_uniform: {note: "checkpoints", status: unverified}
+      aws_s3_tables: {note: "AWS manages it, to check", status: unverified}
+    measure: [planning_time_s, metadata_files, fix_applied_and_effect]
+  - id: M-09
+    operation: Who can run maintenance and who is billed
+    ask: Which identity and which compute runs it, and where does the cost show up for the cost tool?
+    expect:
+      uc_managed_iceberg: {status: unverified}
+      uc_managed_delta_uniform: {status: unverified}
+      aws_s3_tables: {note: "AWS bill line, not Databricks", status: unverified}
+    measure: [identity, compute_used, tag_present_for_cost_tool]
