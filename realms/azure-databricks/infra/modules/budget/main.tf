@@ -11,7 +11,7 @@ variable "name_prefix" { type = string }
 variable "env" { type = string }
 variable "resource_group_id" { type = string }
 
-variable "limit_usd" {
+variable "limit" {
   description = "Monthly amount in the subscription's billing currency."
   type        = number
 }
@@ -30,7 +30,7 @@ locals {
 resource "azurerm_consumption_budget_resource_group" "env" {
   name              = "${var.name_prefix}-${var.env}"
   resource_group_id = var.resource_group_id
-  amount            = var.limit_usd
+  amount            = var.limit
   time_grain        = "Monthly"
 
   time_period {

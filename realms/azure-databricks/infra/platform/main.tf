@@ -107,11 +107,23 @@ module "lakebase" {
   depends_on   = [module.unity_catalog]
 }
 
+module "data_factory" {
+  source               = "../modules/data_factory"
+  name_prefix          = var.name_prefix
+  env                  = var.env
+  location             = var.location
+  resource_group_name  = module.resource_group.name
+  storage_account_id   = module.storage.account_id
+  storage_account_name = module.storage.account_name
+  tags                 = local.tags
+  enabled              = var.data_factory_enabled
+}
+
 module "budget" {
   source            = "../modules/budget"
   name_prefix       = var.name_prefix
   env               = var.env
   resource_group_id = module.resource_group.id
-  limit_usd         = var.budget_usd
+  limit             = var.budget_amount
   emails            = var.budget_emails
 }

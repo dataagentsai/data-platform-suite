@@ -13,7 +13,7 @@ import json
 from datetime import UTC, datetime
 from typing import Any
 
-from dataplatform.adapters.files import to_bytes
+from dataplatform.adapters.files import from_bytes, to_bytes
 from dataplatform.cloud_ports import LAYERS
 from dataplatform.ingest.ports import DeliveryExists
 from dataplatform.keys import checksum
@@ -75,7 +75,7 @@ class S3Landing:
         return out
 
     def read(self, delivery: Delivery) -> list[dict[str, Any]]:
-        return [json.loads(line) for line in self.read_bytes(delivery).decode().splitlines() if line]
+        return from_bytes(self.read_bytes(delivery))
 
     def read_bytes(self, delivery: Delivery) -> bytes:
         return self._get(f"{self._dir(delivery.source, delivery.dataset)}{delivery.window}/{delivery.name}")

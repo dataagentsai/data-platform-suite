@@ -9,3 +9,4 @@ output "landing_volume_path" { value = module.unity_catalog.landing_volume_path 
 output "metadata_store" { value = module.lakebase.project_name }
 output "key_vault" { value = module.key_vault.name }
 output "budget" { value = module.budget.name }
+output "data_factory" { value = module.data_factory.name }

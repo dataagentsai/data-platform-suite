@@ -81,10 +81,10 @@ variable "lakebase_project_name" {
   default     = null
 }
 
-variable "budget_usd" {
-  description = "Monthly budget per environment, in the subscription's currency."
+variable "budget_amount" {
+  description = "Monthly budget per environment, in the subscription's BILLING currency (an account billed in rupees: rupees, not dollars)."
   type        = number
-  default     = 20
+  default     = 1800
 }
 
 variable "budget_emails" {
@@ -97,4 +97,10 @@ variable "secrets_reader_object_ids" {
   description = "Entra object ids of identities that read Key Vault secrets."
   type        = list(string)
   default     = []
+}
+
+variable "data_factory_enabled" {
+  description = "Create the managed copy service for the movers (ADR-033). Idle it costs nothing."
+  type        = bool
+  default     = true
 }

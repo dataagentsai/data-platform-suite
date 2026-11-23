@@ -336,10 +336,12 @@ def main() -> int:
     ap.add_argument("--upkeep-every", type=int, default=1, help="table upkeep every N days, and after the last day")
     ap.add_argument("--reset-tables", action="store_true",
                     help="iceberg-uc: drop every table in <env>_bronze/silver/gold first (a proof run's own catalogs)")
-    ap.add_argument("--table-format", choices=["legacy", "delta", "iceberg", "iceberg-uc"],
+    ap.add_argument("--table-format", choices=["legacy", "delta", "iceberg", "iceberg-uc", "delta-uc-uniform", "s3tables"],
                     default=os.environ.get("DP_TABLE_FORMAT", "legacy"),
                     help="spark engine only: legacy = W1's Delta folders (bronze by delta-rs); delta or iceberg = every "
-                         "layer through the table port (ADR-027), bronze written by Spark")
+                         "layer through the table port (ADR-027), bronze written by Spark; iceberg-uc, "
+                         "delta-uc-uniform = Unity Catalog managed Iceberg or Delta+UniForm; s3tables = AWS S3 Tables "
+                         "(a catalog the session already has, --spark existing)")
     ap.add_argument("--cdc-shape", choices=["native", "dms"], default=os.environ.get("DP_CDC_SHAPE", "native"),
                     help="how change-capture deliveries look: native = JSON lines with an integer feed position; "
                          "dms = parquet shaped like a managed migration service (B4)")
@@ -447,7 +449,7 @@ def main() -> int:
     swept_days: list[dict[str, Any]] = []
 
     def reset_tables(ts: Any) -> None:
-        if a.table_format == "iceberg-uc" and a.reset_tables:  # a proof run starts from empty tables, as a local
+        if a.table_format in ("iceberg-uc", "delta-uc-uniform", "s3tables") and a.reset_tables:  # a proof run starts from empty tables, as a local
             dropped = 0  # run starts from an empty folder; only this domain's run owns these catalogs' schemas
             for layer in ("bronze", "silver", "gold"):
                 for name in ts.tables(layer):

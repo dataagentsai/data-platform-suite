@@ -68,6 +68,14 @@ resource "azurerm_storage_account" "env" {
   tags                            = var.tags
 }
 
+# The file drop zone: where partners and file transfers leave files, <system>/<dataset>/<name> (the FileDrop port).
+# It is a source, not a layer, so it is not in the platform's layer list.
+resource "azurerm_storage_container" "drop" {
+  name                  = "drop"
+  storage_account_id    = azurerm_storage_account.env.id
+  container_access_type = "private"
+}
+
 resource "azurerm_storage_container" "layer" {
   for_each              = toset(var.layers)
   name                  = each.key

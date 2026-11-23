@@ -393,14 +393,19 @@ class UcIcebergStore(IcebergStore):
         self._override = properties  # a caller's own properties win for every layer (tests, probes)
         self.versions = dict(FORMAT_VERSIONS if versions is None else versions)
 
+    using = "iceberg"  # the table provider a managed table is created with (UcDeltaUniformStore: delta)
+    cluster = True  # set the layer's clustering after create (B17)
+
+    def _table_properties(self, layer: str) -> dict[str, str]:
+        return self._override if self._override is not None else layer_properties(layer, self.versions)
+
     def _create(self, layer: str, table: str, df: DataFrame, replace: bool = False) -> None:
         """Create with the layer's properties (format version), then set its clustering (B17)."""
-        w = df.writeTo(self.name(layer, table)).using("iceberg")
-        props = self._override if self._override is not None else layer_properties(layer, self.versions)
-        for k, v in sorted(props.items()):
+        w = df.writeTo(self.name(layer, table)).using(self.using)
+        for k, v in sorted(self._table_properties(layer).items()):
             w = w.tableProperty(k, v)
         w.createOrReplace() if replace else w.create()
-        clause = cluster_clause(layer, list(df.columns))
+        clause = cluster_clause(layer, list(df.columns)) if self.cluster else None
         if clause:
             # shiftleft: allow SL-SEC-01 -- identifiers only, each escaped by quoted(); no values
             self.spark.sql(f"ALTER TABLE {self.name(layer, table)} CLUSTER BY {clause}")
@@ -492,16 +497,87 @@ class UcIcebergStore(IcebergStore):
         self.spark.sql(f"DROP TABLE IF EXISTS {self.name(layer, table)}")
 
 
+# Managed Delta with UniForm (Delta tables that also publish Iceberg metadata, so Iceberg readers see them). Not yet
+# probed on a workspace (owed, TODO B21): IcebergCompatV2 needs column mapping by name and no deletion vectors.
+UNIFORM_PROPERTIES: dict[str, str] = {
+    "delta.enableIcebergCompatV2": "true",
+    "delta.universalFormat.enabledFormats": "iceberg",
+    "delta.columnMapping.mode": "name",
+    "delta.enableDeletionVectors": "false",
+}
+
+
+class UcDeltaUniformStore(UcIcebergStore):
+    """Unity Catalog managed Delta tables with UniForm Iceberg reads: the same names, batch-key replace, DESCRIBE
+    HISTORY version and OPTIMIZE upkeep as UcIcebergStore (ADR-012 catalogs <env>_<layer>); only the provider and the
+    create-time properties differ. Clustering is off until it is probed together with UniForm."""
+
+    format = "delta-uniform"
+    using = "delta"
+    cluster = False
+
+    def _table_properties(self, layer: str) -> dict[str, str]:
+        return dict(UNIFORM_PROPERTIES) if self._override is None else self._override
+
+
+S3TABLES_CATALOG_IMPL = "software.amazon.s3tables.iceberg.S3TablesCatalog"
+_S3TABLES_ARN = re.compile(r"^arn:aws[a-z-]*:s3tables:[a-z0-9-]+:\d{12}:bucket/[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$")
+
+
+def s3tables_spark_conf(bucket_arn: str, catalog: str = "s3t") -> dict[str, str]:
+    """The Spark settings that make `catalog` an AWS S3 Tables Iceberg catalog on the table bucket `bucket_arn`
+    (the s3-tables-catalog-for-iceberg runtime jar must be on the session). A session builder applies them."""
+    if not _NAME.match(catalog):
+        raise ValueError(f"not a safe catalog name: {catalog}")
+    if not _S3TABLES_ARN.match(bucket_arn):
+        raise ValueError(f"not an S3 Tables bucket ARN: {bucket_arn}")
+    return {f"spark.sql.catalog.{catalog}": "org.apache.iceberg.spark.SparkCatalog",
+            f"spark.sql.catalog.{catalog}.catalog-impl": S3TABLES_CATALOG_IMPL,
+            f"spark.sql.catalog.{catalog}.warehouse": bucket_arn,
+            f"spark.sql.catalog.{catalog}.cache-enabled": "false"}
+
+
+class S3TablesStore(IcebergStore):
+    """Iceberg tables in an AWS S3 Tables bucket: <catalog>.<layer>.<table>, one namespace per layer. AWS runs the
+    maintenance (compaction, snapshot expiry, unreferenced-file removal), so upkeep only reports that; tables are
+    format v2; dropping does not purge (the service owns the files)."""
+
+    format = "s3tables"
+
+    def upkeep(self, layer: str, table: str, keep_versions: int = 1) -> dict[str, Any]:
+        return {"managed": 1} if self.exists(layer, table) else {}
+
+    def drop(self, layer: str, table: str) -> None:
+        if self.exists(layer, table):
+            # shiftleft: allow SL-SEC-01 -- identifiers only, each escaped by quoted() or checked by _check(); no values
+            self.spark.sql(f"DROP TABLE {self.name(layer, table)}")
+
+
+TABLE_FORMATS = ("delta", "iceberg", "iceberg-uc", "delta-uc-uniform", "s3tables")
+CATALOG_BY_ENV = ("iceberg-uc", "delta-uc-uniform")  # catalogs named <env>_<layer> (ADR-012), made by Unity Catalog
+
+
+def store_catalog(table_format: str, env: str) -> str:
+    """The catalog name make_store takes for a format: the environment for Unity Catalog formats, the session's
+    catalog (S3 Tables) or the local folder catalog for the rest."""
+    return env if table_format in CATALOG_BY_ENV else "s3t" if table_format == "s3tables" else "ice"
+
+
 def make_store(spark: SparkSession, table_format: str, out: str | Path, catalog: str = "ice") -> TableStore:
-    """The store for a local run under `out`: delta folders out/<layer>/, or the Iceberg catalog set up by
-    local_session(iceberg_warehouse=out/iceberg)."""
+    """The store for a run under `out`: delta folders out/<layer>/, the Iceberg catalog set up by
+    local_session(iceberg_warehouse=out/iceberg), Unity Catalog managed Iceberg or Delta+UniForm (catalog = the
+    environment), or an S3 Tables catalog the session already has (catalog = its name, default s3t)."""
     if table_format == "delta":
         return DeltaPathStore(spark, {layer: Path(out) / layer for layer in LAYERS})
     if table_format == "iceberg":
         return IcebergStore(spark, catalog)
     if table_format == "iceberg-uc":
         return UcIcebergStore(spark, catalog if catalog != "ice" else "dev")
-    raise ValueError(f"unknown table_format {table_format!r} (delta or iceberg)")
+    if table_format == "delta-uc-uniform":
+        return UcDeltaUniformStore(spark, catalog if catalog != "ice" else "dev")
+    if table_format == "s3tables":
+        return S3TablesStore(spark, catalog if catalog != "ice" else "s3t")
+    raise ValueError(f"unknown table_format {table_format!r} (delta, iceberg, iceberg-uc, delta-uc-uniform, s3tables)")
 
 
 class StoreBronzeWriter:

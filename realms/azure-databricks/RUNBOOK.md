@@ -77,7 +77,7 @@ create one with no storage root), then run `infra` again.
 ## 7. Deploy and run the engine job [creates cost]
 
 ```
-make -C realms/azure-databricks bundle ENV=dev      # copies the tyre catalog slice, then databricks bundle deploy -t azure-dev
+make -C realms/azure-databricks bundle ENV=dev      # copies the catalog slice named by SLICE (default 03-clinical; 02-tyre also works), then databricks bundle deploy -t azure-dev
 make -C realms/azure-databricks run ENV=dev         # the job dp-dev-engine-days: 3 compressed days, Iceberg tables in dev_<layer>
 ```
 

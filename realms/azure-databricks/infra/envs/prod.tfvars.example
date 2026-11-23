@@ -7,5 +7,5 @@ location    = "eastus2"  # must offer Lakebase (README, Region)
 force_destroy              = false
 key_vault_purge_protection = true
 lakebase_enabled           = true
-budget_usd                 = 20
+budget_amount              = 1800
 budget_emails              = [] # owner addresses go in the untracked prod.tfvars

@@ -77,7 +77,7 @@ def _table_port(a: Any, tz: str, on_store: Callable[[Any], None] | None, dwd: An
     from dataplatform.adapters.spark_gold import SparkGoldEngine, StoreGoldReader, StoreGoldTables
     from dataplatform.adapters.spark_silver import SparkStageRunner, StoreSilverTables
     from dataplatform.adapters.spark_silver import local_session as spark_session
-    from dataplatform.adapters.table_store import StoreBronzeWriter, make_store
+    from dataplatform.adapters.table_store import StoreBronzeWriter, make_store, store_catalog
     from dataplatform.world.domains import gold_judge_for, models_folder
 
     warehouse = a.out / "iceberg" if a.table_format == "iceberg" else None
@@ -90,7 +90,7 @@ def _table_port(a: Any, tz: str, on_store: Callable[[Any], None] | None, dwd: An
         return spark_session(iceberg_warehouse=warehouse)
 
     spark = local_session()
-    table_store = make_store(spark, a.table_format, a.out, a.env if a.table_format == "iceberg-uc" else "ice")
+    table_store = make_store(spark, a.table_format, a.out, store_catalog(a.table_format, a.env))
     if on_store is not None:
         on_store(table_store)
     # serverless refuses cache() (probed 13 Nov)

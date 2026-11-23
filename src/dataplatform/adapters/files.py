@@ -23,6 +23,13 @@ def to_bytes(rows: list[dict[str, Any]]) -> bytes:
     return "".join(json.dumps(r, sort_keys=True) + "\n" for r in rows).encode()
 
 
+def from_bytes(data: bytes) -> list[dict[str, Any]]:
+    """The rows of a landed JSON-lines file, whoever wrote it. A managed copy service starts its JSON files with a
+    UTF-8 byte-order mark (seen on the second cloud's factory, 20 Nov 2026), and a Windows tool ends lines with CRLF;
+    neither changes the rows. The checksum is still taken over the raw bytes, so a resend is still the same delivery."""
+    return [json.loads(line) for line in data.decode("utf-8-sig").splitlines() if line.strip()]
+
+
 class FileLanding:
     def __init__(self, root: str | Path):
         self.root = Path(root)
@@ -58,7 +65,7 @@ class FileLanding:
         return out
 
     def read(self, delivery: Delivery) -> list[dict[str, Any]]:
-        return [json.loads(line) for line in self.read_bytes(delivery).decode().splitlines() if line]
+        return from_bytes(self.read_bytes(delivery))
 
     def read_bytes(self, delivery: Delivery) -> bytes:
         return (self._dir(delivery.source, delivery.dataset) / delivery.window / delivery.name).read_bytes()

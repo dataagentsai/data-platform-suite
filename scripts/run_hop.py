@@ -101,7 +101,7 @@ def main() -> int:
     ap.add_argument("--engine", choices=["spark", "duckdb"], default=os.environ.get("ENGINE", "spark"))
     ap.add_argument("--spark", choices=["local", "existing"], default="local")
     ap.add_argument("--env", default="dev")
-    ap.add_argument("--table-format", choices=["legacy", "delta", "iceberg", "iceberg-uc"],
+    ap.add_argument("--table-format", choices=["legacy", "delta", "iceberg", "iceberg-uc", "delta-uc-uniform", "s3tables"],
                     default=os.environ.get("DP_TABLE_FORMAT", "legacy"))
     a = ap.parse_args()
     if a.hop != "ingest" and not a.silver:

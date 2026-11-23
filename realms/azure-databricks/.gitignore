@@ -7,3 +7,7 @@ infra/envs/*.tfvars
 infra/envs/*.backend.hcl
 bundle/.databricks/
 __pycache__/
+
+# generated per environment by generate_adf.py (the storage account name is in them); movers.json is the input
+adf/datasets/
+adf/pipelines/

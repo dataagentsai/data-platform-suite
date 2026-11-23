@@ -85,7 +85,7 @@ run "plan" {
   }
 
   assert {
-    condition     = module.budget.name == "${var.name_prefix}-${var.env}" && var.budget_usd > 0 && module.budget.notification_count == 2
+    condition     = module.budget.name == "${var.name_prefix}-${var.env}" && var.budget_amount > 0 && module.budget.notification_count == 2
     error_message = "a budget exists for every environment"
   }
 }

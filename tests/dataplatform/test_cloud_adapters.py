@@ -195,3 +195,25 @@ def test_bucket_name_knows_the_layers(layer):
     else:
         with pytest.raises(ValueError, match="unknown layer"):
             bucket_name("p", "dev", layer)
+
+
+# A managed copy service writes JSON lines with a byte-order mark; a Windows tool ends lines with CRLF. Neither changes the
+# rows, and the checksum stays over the raw bytes (found on the second cloud's factory, 20 Nov 2026).
+@pytest.mark.parametrize(
+    ("case", "raw", "rows"),
+    [
+        ("plain", b'{"a": 1}\n{"a": 2}\n', [{"a": 1}, {"a": 2}]),
+        ("byte-order mark", b'\xef\xbb\xbf{"a": 1}\n{"a": 2}\n', [{"a": 1}, {"a": 2}]),
+        ("CRLF line ends", b'{"a": 1}\r\n{"a": 2}\r\n', [{"a": 1}, {"a": 2}]),
+        ("blank lines and no final newline", b'{"a": 1}\n\n   \n{"a": 2}', [{"a": 1}, {"a": 2}]),
+        ("empty file", b"", []),
+    ],
+)
+@pytest.mark.parametrize("adapter", ["files", "azure"])
+def test_landing_reads_json_lines_whoever_wrote_them(tmp_path, aws, adapter, case, raw, rows):
+    from dataplatform.adapters.files import from_bytes
+
+    assert from_bytes(raw) == rows, case
+    landing = LANDINGS[adapter](tmp_path, aws)
+    delivery = landing.put("src", "ds", "2026-11-20", "f.jsonl", raw, len(rows))
+    assert landing.read(delivery) == rows

@@ -204,8 +204,8 @@ def test_budget_module_has_an_alert(needle):
 
 
 @pytest.mark.parametrize("env", ENVS)
-def test_budget_is_small_and_wired(env):
-    assert 0 < example(env)["budget_usd"] <= 25
+def test_budget_is_set_in_the_billing_currency_and_wired(env):
+    assert 0 < example(env)["budget_amount"] <= 5000  # the billing currency, not dollars: 20 in rupees was 20 rupees
     assert 'module "budget"' in text(INFRA / "platform/main.tf")
 
 

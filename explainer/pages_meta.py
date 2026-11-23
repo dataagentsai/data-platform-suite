@@ -53,6 +53,7 @@ def meta():
                "The highlighted box is the gate. The loader and every pipeline pass through it. Click a box to zoom in.")
     out += "<h2>The pages under this one</h2>"
     out += table(["Page", "What it answers"], [
+        [link("meta-tables"), "All 24 tables at a glance: what each one is for and an example row. Start here."],
         [link("meta-model"), "Which configuration tables exist, every column in them, and how they point at each other."],
         [link("meta-settings"), "Which settings are allowed, where a value can be set, and how the final value is chosen."],
         [link("meta-functions"), "Every function in the store, what it does, what it refuses and who calls it."],
@@ -138,6 +139,97 @@ def meta():
         "I could not verify a run against the engine's managed PostgreSQL from the code alone. "
         f"{src(T_LAKE)} tests the connection logic with fakes.",
     ])
+    return out
+
+
+# ---------------------------------------------------------------------------------------------------------- tables
+CONFIG_TABLES = [
+    ("config.setting_def", "The registry of every allowed setting: scope, type, default and allowed values. A setting "
+     "that is not here is refused (DPM01), so a typo cannot silently do nothing.",
+     "scope <code>dataset</code>, key <code>silver_engine</code>, default <code>job</code>, allowed <code>job, declarative</code>"),
+    ("config.domain", "One business area loaded as a unit. Holds its business timezone (what a day means), its "
+     "environments, the whole manifest as loaded and the manifest's fingerprint.",
+     "<code>tyre</code>, <code>Asia/Kolkata</code>, environments <code>dev, prod</code>"),
+    ("config.domain_setting", "Settings for the whole domain (the platform-level configuration). Only values that "
+     "differ from the registry default are stored.",
+     "domain <code>tyre</code>, key <code>table_format</code>, value <code>iceberg-uc</code>"),
+    ("config.source", "One system the data comes from, inside a domain.",
+     "source id 2, domain <code>tyre</code>, name <code>erp</code>, environment <code>prod</code>"),
+    ("config.dataset", "One table or feed of a source: identity, kind, how it is ingested, its history type, the "
+     "contract it follows, and the manifest it came from.",
+     "<code>sales_order_line</code>, enabled, history <code>scd2</code>, contract <code>sales_order_line</code> 1.2.0"),
+    ("config.dataset_setting", "Settings for one dataset. They override the domain's value.",
+     "dataset 14, key <code>silver_engine</code>, value <code>declarative</code>"),
+    ("config.dataset_column", "The columns of a dataset, in order, from its contract: type, required flag, "
+     "primary-key position and personal-data class.",
+     "dataset 14, position 3, <code>dealer_id</code>, <code>string</code>, required"),
+    ("config.business_key", "Which columns identify a row: the primary key for history and merge, and the dedup key "
+     "for removing duplicates.", "dataset 14, kind <code>primary</code>, position 1, <code>order_id</code>"),
+    ("config.dq_rule", "One data-quality rule of a dataset, written from the contract: the check, its severity and "
+     "what happens when it fails (quarantine the rows, stop the load or warn).",
+     "rule <code>qty_positive</code> on <code>quantity</code>, check <code>min</code> 1, severity <code>major</code>, action <code>quarantine</code>"),
+]
+RUNTIME_TABLES = [
+    ("runtime.config_snapshot", "The exact merged configuration, stored once per fingerprint. Every dataset run points "
+     "at one, so a past run is explained by the configuration it really used.",
+     "fingerprint <code>4be1…</code>, the merged settings as JSON, first seen 20 Nov 06:00"),
+    ("runtime.run", "One platform run: a trigger for a domain in an environment. Its status follows its dataset runs.",
+     "domain <code>tyre</code>, env <code>dev</code>, trigger <code>schedule</code>, type <code>normal</code>, status <code>succeeded</code>"),
+    ("runtime.dataset_run", "One dataset's part of a run: status, the configuration used, the watermark before and "
+     "after, and row counts.",
+     "dataset 14, <code>succeeded</code>, watermark 2026-11-19 to 2026-11-20, counts <code>rows_in 12840, quarantined 3</code>"),
+    ("runtime.step_log", "One step inside a dataset run. The step names are the contract with observability.",
+     "step <code>quality.sales_order_line</code>, <code>warned</code>, 3 rows quarantined"),
+    ("runtime.file_log", "Every delivered file or batch: name, window, checksum, rows declared and rows read, "
+     "outcome. The authority for what is already handled, and append-only.",
+     "<code>sol_20261120.parquet</code>, declared 12843, read 12843, status <code>loaded</code>, load type <code>incremental</code>"),
+    ("runtime.error_log", "A failure with its class, its step and a redacted message (secrets removed, capped at "
+     "4000 characters).", "step <code>land</code>, class <code>ChecksumMismatch</code>, file changed since first delivery"),
+    ("runtime.watermark", "The high-water mark of a dataset. It moves in the same transaction that closes a "
+     "successful run, never before.", "dataset 14, value <code>2026-11-20</code>"),
+    ("runtime.bookmark", "A named cursor, for when one watermark is not enough: a shard or a change-feed position.",
+     "dataset 21, key <code>dms_feed</code>, value <code>00004812</code>"),
+    ("runtime.watermark_audit", "Who moved a watermark by hand, from what to what and why. Append-only.",
+     "dataset 14, <code>2026-11-20</code> to <code>2026-11-15</code>, reason: supplier resent a week"),
+    ("runtime.backfill_plan", "A planned reprocessing: which windows, from which date and why.",
+     "plan <code>BF-017</code>, window <code>2026-10</code>, active from 22 Nov, reason: wrong unit price"),
+    ("runtime.correction", "One corrected value under a backfill plan. Silver is never edited: the correction is a "
+     "row and gold is rebuilt from it.",
+     "plan <code>BF-017</code>, order A-1002 line 1, field <code>unit_price</code>, value 41.50, was 14.50"),
+    ("runtime.dq_result", "What each quality rule found in each run: counts only, never the failing rows.",
+     "rule <code>qty_positive</code>, checked 12843, failed 3, action <code>quarantine</code>"),
+    ("runtime.dq_profile", "A statistical profile of what a run loaded (counts, nulls, ranges). The newest one is what "
+     "drift is compared against.", "rows 12840, <code>quantity</code> min 1, max 96, nulls 0"),
+    ("runtime.batch_void", "A loaded batch declared not to count, with a reason and an approver. The file log is not "
+     "touched.", "batch <code>erp/sales_order_line/2026-11-18</code>, reason: duplicate export, approved by the data owner"),
+    ("runtime.table_lease", "A short lock so only one run writes a table at a time. A lease past its expiry (a crashed "
+     "run) is taken over.", "table <code>silver.erp__sales_order_line</code>, run 7e3a…, expires 06:30"),
+]
+
+
+@page("meta-tables", "The 24 tables at a glance: purpose and an example row", parent="meta", short="All tables",
+      blurb="Nine config tables say what to load. Fifteen runtime tables say what happened.")
+def meta_tables():
+    out = ("<p class='lead'>The store has 24 tables in two schemas. The <code>config</code> schema says what to load and "
+           "how. The <code>runtime</code> schema says what happened. This page gives each table's purpose and one "
+           "example row. The example values are made up in the shape of the tyre company's data. The table and column "
+           "names are the real ones.</p>"
+           "<p>Why so many? Key and value rows are right for flat settings. They are wrong for three kinds of fact: "
+           "lists (columns, keys, rules), facts that must change together (a run closing and its watermark moving), "
+           "and records that must never be edited (audits, voids, corrections). Each of those has its own typed "
+           "table.</p>")
+    out += "<h2>Config: what to load and how (9 tables)</h2>"
+    out += table(["Table", "Purpose", "Example row"], [[f"<code>{n}</code>", p, e] for n, p, e in CONFIG_TABLES])
+    out += "<h2>Runtime: what happened (15 tables)</h2>"
+    out += table(["Table", "Purpose", "Example row"], [[f"<code>{n}</code>", p, e] for n, p, e in RUNTIME_TABLES])
+    out += "<h2>How the tables point at each other</h2>"
+    out += table(["From", "To"], [
+        ["domain", "source, then dataset, then its settings, columns, business keys and quality rules"],
+        ["run", "dataset run, then its steps, files and profile; errors and quality results hang off the run and the dataset"],
+        ["dataset", "watermark, bookmarks, the watermark audit, backfill plans (with their corrections) and voided batches"],
+    ])
+    out += (f"<p>Column by column detail: {link('meta-model')} for <code>config</code> and {link('meta-runtime')} for "
+            f"<code>runtime</code>. Settings and how a value is chosen: {link('meta-settings')}.</p>")
     return out
 
 

@@ -23,13 +23,14 @@ AUTO_APPROVE ?=
 APPROVE := $(if $(AUTO_APPROVE),-auto-approve,)
 TARGET := azure-$(ENV)
 ENGINE := $(REPO)/realms/databricks/engine
-TYRE_MANIFEST ?= $(HOME)/data-platform-catalog/slices/02-tyre
+SLICE ?= 03-clinical
+SLICES_DIR ?= $(HOME)/data-platform-catalog/slices
 STATE_RG ?= $(shell sed -n 's/^resource_group_name *= *"\(.*\)"/\1/p' $(INFRA)/envs/dev.backend.hcl)
 STATE_ACCOUNT ?= $(shell sed -n 's/^storage_account_name *= *"\(.*\)"/\1/p' $(INFRA)/envs/dev.backend.hcl)
 STATE_CONTAINER ?= $(shell sed -n 's/^container_name *= *"\(.*\)"/\1/p' $(INFRA)/envs/dev.backend.hcl)
 STATE_LOCATION ?= eastus2
 
-.PHONY: check test generate bundle-check tf-fmt tf-validate bootstrap plan infra catalog-copy bundle-validate bundle run deploy destroy
+.PHONY: adf-generate adf-deploy check test generate bundle-check tf-fmt tf-validate bootstrap plan infra catalog-copy bundle-validate bundle run deploy destroy
 
 check: test bundle-check tf-validate
 
@@ -73,8 +74,8 @@ infra:
 # The engine's tasks read the spec catalog slice from beside the engine bundle (a git-ignored copy; the engine's own
 # convention). It is copied in before every deploy.
 catalog-copy:
-	mkdir -p $(ENGINE)/_catalog
-	rsync -a --delete $(TYRE_MANIFEST)/ $(ENGINE)/_catalog/
+	mkdir -p $(ENGINE)/_catalog/slices
+	rsync -a --delete $(SLICES_DIR)/$(SLICE) $(ENGINE)/_catalog/slices/
 
 bundle-validate: bundle-check
 	cd bundle && DATABRICKS_HOST=$${DATABRICKS_HOST:-$$($(TF) -chdir=../$(INFRA)/platform output -raw workspace_url)} \
@@ -86,7 +87,7 @@ bundle: bundle-check catalog-copy
 
 run:
 	cd bundle && DATABRICKS_HOST=$${DATABRICKS_HOST:-$$($(TF) -chdir=../$(INFRA)/platform output -raw workspace_url)} \
-		databricks bundle run engine_days -t $(TARGET)
+		databricks bundle run engine_days -t $(TARGET) --params slice=$(SLICE),days=3
 
 deploy: infra bundle
 
@@ -94,3 +95,12 @@ destroy:
 	cd bundle && DATABRICKS_HOST=$${DATABRICKS_HOST:-$$($(TF) -chdir=../$(INFRA)/platform output -raw workspace_url)} \
 		databricks bundle destroy -t $(TARGET) --auto-approve
 	$(TF) -chdir=$(INFRA)/platform destroy -input=false -var-file=../envs/$(ENV).tfvars
+
+# The managed copy service for the movers (ADR-033). adf/movers.json is the input; the generated objects hold the
+# storage account name, so they are not committed. The factory itself is made by `make infra`.
+ACCOUNT ?= $(shell $(TF) -chdir=$(INFRA)/platform output -raw storage_account 2>/dev/null)
+adf-generate:
+	python3 generate_adf.py --account $(ACCOUNT)
+
+adf-deploy: adf-generate
+	python3 deploy_adf.py deploy --factory $(shell $(TF) -chdir=$(INFRA)/platform output -raw data_factory) --resource-group $(shell $(TF) -chdir=$(INFRA)/platform output -raw resource_group)
