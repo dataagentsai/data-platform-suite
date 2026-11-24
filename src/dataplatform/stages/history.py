@@ -26,7 +26,7 @@ from dataplatform.stages.common import SEP, Out, StageCtx, arrival_desc, quarant
 
 SILVER_ONLY = ("_silver_run_id", "_silver_loaded_at", "_record_hash")
 RECOMPUTED = ("_valid_from", "_valid_to", "_is_current", "_is_deleted", "_deleted_at", "_seq_from", "_row_key")
-WORK = ("_pos", "_ts", "_dts", "_existing", "_t", "_new", "_ver", "_start", "_gts", "_rn")
+WORK = ("_pos", "_ts", "_dts", "_existing", "_t", "_new", "_ver", "_start", "_gts", "_rn", "_ord", "_rl", "_lastop", "_lastdts")
 
 
 def working(current: DataFrame) -> DataFrame:
@@ -147,27 +147,41 @@ def scd2(inc: DataFrame, cur: DataFrame | None, plan: SilverPlan) -> DataFrame:
     # engine the stages run on keeps the null skipping of (docs/DUCKDB-SPIKE.md)
     before = F.last_value("_t", F.lit(True)).over(by_pos.rowsBetween(Window.unboundedPreceding, -1))
     events = (
-        # a delete event never opens a version (it marks the one it falls in); a stored version keeps its values
-        events.withColumn("_t", F.when((F.col("_op") == "D") & ~F.col("_existing"), F.lit(None)).otherwise(tracked))
+        # A delete never opens a version and never changes one's values: it marks the version it falls in, whatever its
+        # row carries (decided 24 Nov 2026). The one exception is a key's first event: a delete for a key silver never
+        # saw makes the deleted version from its own row. A stored version keeps its values.
+        events.withColumn("_ord", F.row_number().over(by_pos))
+        .withColumn("_t", F.when((F.col("_op") == "D") & ~F.col("_existing") & (F.col("_ord") > 1), F.lit(None))
+                    .otherwise(tracked))
         .withColumn("_new", F.when(before.isNull(), True).when(F.col("_t").isNull(), False)
                     .otherwise(F.col("_t") != before))
         .withColumn("_ver", F.sum(F.col("_new").cast("int")).over(
             by_pos.rowsBetween(Window.unboundedPreceding, Window.currentRow)))
     )
     group = Window.partitionBy("_key_hash", "_ver")
-    latest = group.orderBy(F.col(o).desc_nulls_last(), F.col("_existing").asc_nulls_first(), *arrival_desc(events))
+    arrival = (F.col(o).desc_nulls_last(), F.col("_existing").asc_nulls_first(), *arrival_desc(events))
+    # the version's values come from its last event that carries values (a delete that only marks does not); whether it
+    # is deleted, and when, come from its very last event
+    value_order = group.orderBy(F.col("_t").isNull().cast("int").asc(), *arrival)
+    last_order = group.orderBy(*arrival)
     versions = events.withColumns({
         "_start": F.min("_pos").over(group),
         "_gts": F.min("_ts").over(group),
-        "_rn": F.row_number().over(latest),
+        "_rn": F.row_number().over(value_order),
+        "_rl": F.row_number().over(last_order),
+    })
+    versions = versions.withColumns({
+        "_lastop": F.max(F.when(F.col("_rl") == 1, F.col("_op"))).over(group),
+        "_lastdts": F.max(F.when(F.col("_rl") == 1, F.col("_dts"))).over(group),
     }).where("_rn = 1")
     per_key = Window.partitionBy("_key_hash").orderBy(F.col("_start").asc_nulls_first())
-    deleted = F.col("_op") == "D"
+    deleted = F.col("_lastop") == "D"
     out = versions.withColumns({
         "_valid_from": F.min("_gts").over(per_key.rowsBetween(Window.currentRow, Window.unboundedFollowing)),
         "_is_current": F.lead("_start").over(per_key).isNull(),
         "_is_deleted": deleted,
-        "_deleted_at": F.when(deleted, F.col("_dts")),
+        "_deleted_at": F.when(deleted, F.col("_lastdts")),
+        "_op": F.col("_lastop"),
         "_seq_from": F.col("_start"),
         "_row_key": F.sha2(F.concat_ws("|", F.col("_key_hash"), F.col("_start").cast("string")), 256),
     }).withColumn("_valid_to", F.lead("_valid_from").over(per_key))

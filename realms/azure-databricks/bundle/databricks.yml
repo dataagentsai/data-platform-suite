@@ -76,6 +76,10 @@ resources:
         default: compressed
       - name: housekeeping_days
         default: '1'
+      - name: table_format
+        default: iceberg-uc
+      - name: scale
+        default: '0.1'
       environments:
       - environment_key: default
         spec:
@@ -97,6 +101,10 @@ resources:
           - '{{job.parameters.calendar}}'
           - --housekeeping-days
           - '{{job.parameters.housekeeping_days}}'
+          - --table-format
+          - '{{job.parameters.table_format}}'
+          - --scale
+          - '{{job.parameters.scale}}'
           - --env
           - ${var.env}
           - --meta-instance

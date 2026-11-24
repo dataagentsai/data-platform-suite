@@ -17,7 +17,7 @@ spec.loader.exec_module(pf)
 
 def runner(answers: dict[str, tuple[int, str]]):
     """Answer a command by the longest key that its text starts with; anything else is 'not installed'."""
-    def run(cmd: list[str]) -> tuple[int, str]:
+    def run(cmd: list[str], cwd: str | None = None) -> tuple[int, str]:
         text = " ".join(cmd)
         hits = [k for k in answers if text.startswith(k)]
         return answers[max(hits, key=len)] if hits else (127, f"{cmd[0]}: not installed")
@@ -265,3 +265,21 @@ def test_secret_scan_knows_examples_and_fixtures(tmp_path, case, name, content, 
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(content)
     assert pf.no_secrets_tracked(ctx({"git -C": (0, name)}, tmp_path))[0] == expect
+
+
+@pytest.mark.parametrize(
+    ("case", "text", "must_not_contain"),
+    [
+        ("an account number in an error", "User: arn:aws:iam::477165397616:user/x is not authorized", "477165397616"),
+        ("an e-mail address", "signed in as someone.name@example.com now", "someone.name@example.com"),
+        ("both", "477165397616 and a.b@c.org", "c.org"),
+    ],
+)
+def test_details_never_show_account_numbers_or_emails(case, text, must_not_contain):
+    assert must_not_contain not in pf.short(text)
+
+
+def test_a_passing_command_shows_none_of_its_output():
+    status, detail = pf.ok_if_command_works(lambda c: ["databricks", "current-user", "me"])(
+        ctx({"databricks current-user": (0, '{"emails": [{"value": "a.b@c.org"}]}')}))
+    assert (status, detail) == ("pass", "ok")

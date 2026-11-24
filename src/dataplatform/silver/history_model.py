@@ -7,12 +7,15 @@ the stages disagree, one of them is wrong, and the disagreement is the finding.
 A change is (key, tracked value, sequence, op), op being I, U or D. A delete row carries the value its key had just before
 it, as in the contract's cases (silver/history_contract.py). The model reads that contract as a rule:
 
-  Type 2: order a key's changes by sequence. A new version opens when the tracked value differs from the one before. A
-  version starts at its first change. The last version is current. A version is deleted when its last change is a delete.
+  Type 2: order a key's changes by sequence. A change that is not a delete opens a version when its value differs from
+  the current one. A delete never opens a version and never changes a value: it marks the version it falls in (a delete
+  for a key with no version yet makes the deleted version from its own row). The last version is current. A version is
+  deleted when its last change is a delete.
   Type 1: one row per key, from its change with the highest sequence; deleted when that change is a delete.
 
-Open questions the contract does not answer (so the model's choice is not a ruling): what a second delete of an
-already deleted key means, and what a delete whose value differs from the stored version means.
+Decided by the owner on 24 Nov 2026: the same changes give the same silver however the feed is split into batches; a second
+delete of an already deleted key does not make a second version; a delete never changes values (it marks the version it
+falls in).
 """
 
 from __future__ import annotations
@@ -30,18 +33,27 @@ def _distinct(changes: Iterable[Change]) -> list[Change]:
 
 
 def type2_versions(changes: Iterable[Change]) -> list[Version]:
+    """One pass per key, in sequence order. A change that is not a delete opens a version when its value differs from the
+    current version's, and otherwise joins it. A delete never opens a version and never changes one's value: it marks the
+    version it falls in. The one exception is a key's first change: a delete for a key with no version makes the deleted
+    version from its own row. A version is deleted when its last change is a delete."""
     by_key: dict[str, list[Change]] = defaultdict(list)
     for c in _distinct(changes):
         by_key[c[0]].append(c)
     out: list[Version] = []
     for key in sorted(by_key):
-        runs: list[list[Change]] = []
-        for c in sorted(by_key[key], key=lambda c: c[2]):
-            if runs and runs[-1][0][1] == c[1]:
-                runs[-1].append(c)
+        versions: list[list] = []  # [value, start sequence, last op]
+        for _, value, seq, op in sorted(by_key[key], key=lambda c: c[2]):
+            if op == "D":
+                if not versions:
+                    versions.append([value, seq, "D"])
+                else:
+                    versions[-1][2] = "D"
+            elif versions and versions[-1][0] == value:
+                versions[-1][2] = op
             else:
-                runs.append([c])
-        out += [(key, r[0][1], r[0][2], i == len(runs) - 1, r[-1][3] == "D") for i, r in enumerate(runs)]
+                versions.append([value, seq, op])
+        out += [(key, v[0], v[1], i == len(versions) - 1, v[2] == "D") for i, v in enumerate(versions)]
     return out
 
 

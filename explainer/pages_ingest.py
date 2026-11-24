@@ -89,6 +89,7 @@ def ingest():
         [link("ingest-steps"), "The checks every batch passes before it may enter bronze."],
         [link("ingest-lander"), "What landing looks like, what a bronze row looks like, and why writing a batch twice changes nothing."],
         [link("ingest-sources"), "The source ports and the adapters behind them, and which of them are real connectors."],
+        [link("ingest-families"), "The eight families of source routes, the products and their menus of routes, and how far each route is proven."],
     ])
     out += "<h2>The design decisions</h2>"
     out += table(["Decision", "What it means", "Why"], [

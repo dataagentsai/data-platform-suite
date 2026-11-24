@@ -141,47 +141,22 @@ def lands_inside_a_run(h: History) -> bool:
     return False
 
 
-def delete_ahead_of_its_image(h: History) -> bool:
-    """The second known gap (found by this test, 23 Nov 2026): a delete that arrives before the update it follows carries
-    that update's value, which differs from the stored version. Silver overwrites the stored value in place, and the
-    earlier history is not rebuilt when the update arrives. Skipped until fixed; test_silver_stages has the minimal case."""
-    seen: list[Change] = []
+def late_update_after_delete(h: History) -> bool:
+    """The known gap (23 Nov 2026): an update that arrives after a delete of the same key but has an earlier sequence than the
+    delete. Silver stores a delete as a flag on a version, without the delete's sequence, so the delete cannot move to the
+    version the late update opens. Skipped until the sequence is stored; test_silver_stages has the minimal case."""
+    deleted_at: dict[str, int] = {}
     for batch in h.arrivals:
         for c in batch:
-            earlier = [s for s in seen if s.key == c.key and s.seq < c.seq]
-            if c.op == "D" and earlier and max(earlier, key=lambda s: s.seq).value != c.value:
+            if c.op != "D" and c.key in deleted_at and c.seq < deleted_at[c.key]:
                 return True
-            seen.append(c)
+            if c.op == "D":
+                deleted_at[c.key] = max(deleted_at.get(c.key, c.seq), c.seq)
     return False
-
-
-def delete_twice_in_one_batch(h: History) -> bool:
-    """The third known gap (23 Nov 2026): the same delete twice inside one batch becomes two versions. Skipped until
-    fixed; test_silver_stages has the minimal case (delete-twice-in-one-batch)."""
-    return any(sum(c.op == "D" and batch.count(c) > 1 for c in set(batch)) for batch in h.arrivals)
-
-
-def delete_after_delete(h: History) -> bool:
-    """An open question, not a bug: what a second delete of an already deleted key means. Silver keeps two deleted
-    versions; the model says one. The contract does not say, so those histories are skipped until the owner decides."""
-    last: dict[str, str] = {}
-    for c in h.changes:
-        if c.op == "D" and last.get(c.key) == "D":
-            return True
-        last[c.key] = c.op
-    return False
-
-
-def return_after_delete_in_one_batch(h: History) -> bool:
-    """The fourth known gap (23 Nov 2026): a delete and a later change back to the same value, in one batch, become two
-    versions; in two batches they are one live version. Skipped until fixed (test_silver_stages has the minimal case)."""
-    return any(d.op == "D" and any(c.key == d.key and c.seq > d.seq and c.op != "D" and c.value == d.value for c in batch)
-               for batch in h.arrivals for d in batch)
 
 
 def known_gap(h: History) -> bool:
-    return (lands_inside_a_run(h) or delete_ahead_of_its_image(h) or delete_twice_in_one_batch(h)
-            or delete_after_delete(h) or return_after_delete_in_one_batch(h))
+    return lands_inside_a_run(h) or late_update_after_delete(h)
 
 
 def explain(h: History) -> str:

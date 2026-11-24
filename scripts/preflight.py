@@ -42,7 +42,7 @@ class Ctx:
     env_name: str = "dev"
     root: Path = ROOT
     env: dict[str, str] = field(default_factory=lambda: dict(os.environ))
-    run: Callable[[list[str]], tuple[int, str]] = field(default=None)  # type: ignore[assignment]
+    run: Callable[..., tuple[int, str]] = field(default=None)  # type: ignore[assignment]
 
     def __post_init__(self) -> None:
         if self.run is None:
@@ -55,17 +55,20 @@ class Ctx:
         return ["databricks", *args, *(["-p", self.databricks_profile] if self.databricks_profile else [])]
 
 
-def _run(cmd: list[str]) -> tuple[int, str]:
+def _run(cmd: list[str], cwd: str | None = None) -> tuple[int, str]:
     if shutil.which(cmd[0]) is None:
         return NOT_INSTALLED, f"{cmd[0]}: not installed"
     try:
-        p = subprocess.run(cmd, capture_output=True, text=True, timeout=60, check=False)  # noqa: S603 -- fixed argv, no shell
+        p = subprocess.run(cmd, capture_output=True, text=True, timeout=60, check=False, cwd=cwd)  # noqa: S603 -- fixed argv, no shell
     except subprocess.TimeoutExpired:
         return 124, "timed out after 60 seconds"
     return p.returncode, (p.stdout + p.stderr).strip()
 
 
 def short(text: str) -> str:
+    """One line, capped, with account numbers and e-mail addresses masked: a check's detail is shown and may be pasted."""
+    text = re.sub(r"\b\d{12}\b", "<account>", text)
+    text = re.sub(r"[\w.+-]+@[\w-]+(\.[\w-]+)+", "<email>", text)
     return re.sub(r"\s+", " ", text)[:_SHOW]
 
 
@@ -102,7 +105,7 @@ def tool(cmd: list[str], minimum: tuple[int, ...] = ()) -> Callable[[Ctx], tuple
 def ok_if_command_works(build: Callable[[Ctx], list[str]]) -> Callable[[Ctx], tuple[str, str]]:
     def t(c: Ctx) -> tuple[str, str]:
         rc, out = c.run(build(c))
-        return (PASS, short(out)[:80]) if rc == 0 else (FAIL, short(out))
+        return (PASS, "ok") if rc == 0 else (FAIL, short(out))
     return t
 
 
@@ -251,7 +254,8 @@ def bundle_valid(folder: str) -> Callable[[Ctx], tuple[str, str]]:
         d = c.root / folder
         if not d.exists():
             return FAIL, f"{folder} not found"
-        rc, out = c.run(["databricks", "bundle", "validate", "--chdir", str(d), *(["-p", c.databricks_profile] if c.databricks_profile else [])])
+        rc, out = c.run(["databricks", "bundle", "validate", *(["-p", c.databricks_profile] if c.databricks_profile else [])],
+                        cwd=str(d))
         return (PASS, "valid") if rc == 0 else (FAIL, short(out))
     return t
 

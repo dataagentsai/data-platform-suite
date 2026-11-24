@@ -510,22 +510,18 @@ SCD2_MORE = [
         "a delete that arrives before the update it follows keeps the earlier history",
         [[("b", 3, "x", 21, U, 0, 1)], [("b", 1, "x", 36, D, 5, 2)], [("b", 1, "x", 34, I, 9, 3)]],
         [("b", 3, 21, False, False), ("b", 1, 34, True, True)],
-        marks=_known_bug("a delete carries the value of the update it follows; arriving first it overwrites the stored "
-                         "version's value in place, and the earlier history is lost (found by test_silver_properties, "
-                         "23 Nov 2026)"), id="delete-before-its-update"),
+        marks=_known_bug("a delete is stored as a flag on the version it fell in, without its sequence. When the update "
+                         "it follows arrives later, a new version opens after the older one, but the delete stays on the "
+                         "older version: history is kept, the key looks live (found by test_silver_properties, "
+                         "23 Nov 2026; needs the delete's sequence stored)"), id="delete-before-its-update"),
     pytest.param(
         "the same delete twice in one batch is one deleted version",
         [[("a", 2, "y", 5, D, 0, 1), ("a", 2, "y", 5, D, 0, 2)]],
-        [("a", 2, 5, True, True)],
-        marks=_known_bug("a change sent twice in one batch is dropped, but a delete sent twice becomes two versions, one "
-                         "current and one not (found by test_silver_properties, 23 Nov 2026)"), id="delete-twice-in-one-batch"),
+        [("a", 2, 5, True, True)], id="delete-twice-in-one-batch"),
     pytest.param(
         "a delete and a return to the same value in one batch is one live version, as when they arrive in two batches",
         [[("a", 3, "x", 1, D, 0, 1), ("a", 3, "x", 18, U, 1, 2)]],
-        [("a", 3, 1, True, False)],
-        marks=_known_bug("sent as two batches the key is live again in one version (return-same-value); sent as one "
-                         "batch it becomes two versions, so silver depends on how the feed was split (found by "
-                         "test_silver_properties, 23 Nov 2026)"), id="return-after-delete-in-one-batch"),
+        [("a", 3, 1, True, False)], id="return-after-delete-in-one-batch"),
 ]
 
 
