@@ -123,6 +123,7 @@ def tests():
         [link("tests-incidents"), "Every planted incident: its day, the rule that detects it, the layer that handles it, and the recorded result."],
         [link("tests-tables"), "How a case table looks, the contract tables every adapter must pass, the history contract, and the same tests on two engines."],
         [link("tests-by-layer"), "One table with a row per layer, and the check of how many catalog obligations a test cites."],
+        [link("tests-strategy"), "The strategy as a whole: generated tests, how they join the simulated company, the tiers and the open-source tools."],
     ])
     out += "<h2>The design decisions behind the proof</h2>"
     out += table(["Decision", "Why"], [

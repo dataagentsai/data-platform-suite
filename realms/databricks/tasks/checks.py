@@ -97,8 +97,12 @@ def detectors(spark, rid, day, today, world, meta, silver) -> list[CheckResult]:
 def metric_view(spark, rid, day, ds, sql) -> CheckResult:
     """SERV-04: the business definition lives in one place, and it agrees with the gold table."""
     name = ds["gold_table"].rsplit(".", 1)[0] + ".orders_metrics"
+    import re
+    if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*){2}", name):
+        raise ValueError(f"not a catalog.schema.name view: {name!r}")
     try:
         spark.sql(sql)
+        # shiftleft: allow SL-SEC-01 -- name matched the dotted-identifier pattern just above
         mv = spark.sql(f"SELECT MEASURE(orders) AS o, ROUND(MEASURE(revenue), 2) AS r FROM {name}").first()
         g = spark.table(ds["gold_table"]).agg(F.sum("orders").alias("o"), F.round(F.sum("amount"), 2).alias("r")).first()
         ok = mv["o"] == g["o"] and abs(float(mv["r"]) - float(g["r"])) < 0.01

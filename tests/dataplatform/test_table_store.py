@@ -161,7 +161,9 @@ def _commits(store: Any, layer: str, table: str) -> int:
 
     name = store.name(layer, table)
     if isinstance(store, DeltaPathStore):
+        # shiftleft: allow SL-SEC-01 -- name comes from store.name(): quoted identifiers, no values
         return int(store.spark.sql(f"DESCRIBE HISTORY {name}").count())
+    # shiftleft: allow SL-SEC-01 -- name comes from store.name(): quoted identifiers, no values
     return int(store.spark.sql(f"SELECT * FROM {name}.snapshots").count())
 
 

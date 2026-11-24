@@ -20,8 +20,11 @@ for ds,kind in DS.items():
         n=(q(f"SELECT count(*) FROM {J} WHERE {jw}")[0][0], q(f"SELECT count(*) FROM {D} WHERE {dw}")[0][0])
         v=(q(f"SELECT count(*) FROM {J}")[0][0], q(f"SELECT count(*) FROM {D}")[0][0])
     else:
+        # shiftleft: allow SL-SEC-01 -- developer script: table names come from the fixed DS list, columns are read back from our own tables
         jw=dw="true"; n=(q(f"SELECT count(*) FROM {J}")[0][0], q(f"SELECT count(*) FROM {D}")[0][0]); v=n
+    # shiftleft: allow SL-SEC-01 -- developer script: table names come from the fixed DS list, columns are read back from our own tables
     a=q(f"SELECT count(*) FROM (SELECT {cols} FROM {J} WHERE {jw} EXCEPT ALL SELECT {cols} FROM {D} WHERE {dw})")[0][0]
+    # shiftleft: allow SL-SEC-01 -- developer script: table names come from the fixed DS list, columns are read back from our own tables
     b=q(f"SELECT count(*) FROM (SELECT {cols} FROM {D} WHERE {dw} EXCEPT ALL SELECT {cols} FROM {J} WHERE {jw})")[0][0]
     ok = n[0]==n[1] and v[0]==v[1] and a=="0" and b=="0"
     allok&=ok

@@ -3,12 +3,22 @@ Spark session, Unity Catalog managed Iceberg tables (<env>_<layer>.<schema>.<tab
 Lakebase as the job's identity. The simulated world (sources, landing) lives on the driver's local disk; the ops page
 and the report are copied to the volume <env>_ops.reports.runs/<run id>/ to open afterwards."""
 import argparse
+import re
 import os
 import runpy
 import secrets
 import shutil
 import sys
 from pathlib import Path
+
+def word(pattern: str):
+    """An argparse type: the value must match `pattern` whole, so it can go into a name or a path."""
+    def check(value: str) -> str:
+        if not re.fullmatch(pattern, value):
+            raise argparse.ArgumentTypeError(f"{value!r} does not match {pattern}")
+        return value
+    return check
+
 
 p = argparse.ArgumentParser()
 p.add_argument("--slice", default="02-tyre", help="the catalog slice to run (a folder of _catalog/slices/)")
@@ -18,9 +28,9 @@ p.add_argument("--calendar", default="", help="a named world calendar; empty = t
 p.add_argument("--housekeeping-days", default="", help="bronze housekeeping's correction window; empty = off")
 p.add_argument("--table-format", default="iceberg-uc", choices=["iceberg-uc", "delta-uc-uniform", "s3tables"],
                help="the table format of every layer (the table port, ADR-027)")
-p.add_argument("--env", default="dev")
+p.add_argument("--env", default="dev", type=word(r"[a-z][a-z0-9]{0,15}"))
 p.add_argument("--meta-instance", default="dp-meta-dev")
-p.add_argument("--run-id", default="manual")
+p.add_argument("--run-id", default="manual", type=word(r"[A-Za-z0-9_-]{1,64}"))
 p.add_argument("--root", required=True, help="${workspace.file_path}: serverless gives a job file no __file__")
 a, _ = p.parse_known_args()
 
@@ -43,7 +53,9 @@ finally:
     from pyspark.sql import SparkSession
 
     spark = SparkSession.builder.getOrCreate()
+    # shiftleft: allow SL-SEC-01 -- env matched [a-z][a-z0-9]{0,15} when the arguments were read: identifier characters only
     spark.sql(f"CREATE SCHEMA IF NOT EXISTS {a.env}_ops.reports")
+    # shiftleft: allow SL-SEC-01 -- env matched [a-z][a-z0-9]{0,15} when the arguments were read: identifier characters only
     spark.sql(f"CREATE VOLUME IF NOT EXISTS {a.env}_ops.reports.runs")
     dest = Path(f"/Volumes/{a.env}_ops/reports/runs/{a.run_id}")
     dest.mkdir(parents=True, exist_ok=True)

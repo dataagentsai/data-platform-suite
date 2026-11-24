@@ -105,6 +105,7 @@ class SqlSource:
         sets = ", ".join(f"{ident(c)} = excluded.{ident(c)}" for c in names if c not in t.key)
         newer = " WHERE tgt.change_seq < excluded.change_seq" if "change_seq" in names else ""
         sql = (
+            # shiftleft: allow SL-SEC-01 -- table and column names pass ident() (^[a-z_][a-z0-9_]{0,62}$); every value is a bound parameter
             f"INSERT INTO {self.d.qualify(system, t.name)} AS tgt ({', '.join(ident(c) for c in names)}) "  # nosec B608
             f"VALUES ({', '.join([p] * len(names))}) ON CONFLICT ({', '.join(ident(k) for k in t.key)}) "
             f"DO UPDATE SET {sets}{newer}"
@@ -114,6 +115,7 @@ class SqlSource:
     def _delete(self, cur: Any, system: str, t: TableSpec, group: list[SourceChange]) -> None:
         where = " AND ".join(f"{ident(k)} = {self.d.placeholder}" for k in t.key)
         cur.executemany(
+            # shiftleft: allow SL-SEC-01 -- table and column names pass ident() (^[a-z_][a-z0-9_]{0,62}$); every value is a bound parameter
             f"DELETE FROM {self.d.qualify(system, t.name)} WHERE {where}",  # nosec B608
             [tuple(c.row[k] for k in t.key) for c in group],
         )
@@ -122,6 +124,7 @@ class SqlSource:
         names = [c for c, _ in t.columns]
         p = self.d.placeholder
         cur.executemany(
+            # shiftleft: allow SL-SEC-01 -- table and column names pass ident() (^[a-z_][a-z0-9_]{0,62}$); every value is a bound parameter
             f"INSERT INTO {self.d.qualify(system, t.name + '__changes')} (op, committed_at, "  # nosec B608
             f"{', '.join(ident(c) for c in names)}) VALUES ({', '.join([p] * (len(names) + 2))})",
             [(c.op, c.committed_at, *(c.row.get(n) for n in names)) for c in changes],
@@ -131,6 +134,7 @@ class SqlSource:
         names = [c for c, _ in table.columns]
         cur = self.conn.cursor()
         cur.executemany(
+            # shiftleft: allow SL-SEC-01 -- table and column names pass ident() (^[a-z_][a-z0-9_]{0,62}$); every value is a bound parameter
             f"INSERT INTO {self.d.qualify(system, table.name + '__copy')} ({', '.join(ident(c) for c in names)}) "  # nosec B608
             f"VALUES ({', '.join([self.d.placeholder] * len(names))})",
             [tuple({**r, "extracted_at": extracted_at}.get(c) for c in names) for r in rows],
@@ -146,10 +150,12 @@ class SqlSource:
 
     def rows(self, system: str, table: TableSpec) -> list[Row]:
         order = ", ".join(ident(k) for k in table.key)
+        # shiftleft: allow SL-SEC-01 -- table and column names pass ident() (^[a-z_][a-z0-9_]{0,62}$); every value is a bound parameter
         return self._select(f"SELECT * FROM {self.d.qualify(system, table.name)} ORDER BY {order}")  # nosec B608
 
     def feed(self, system: str, table: TableSpec, after_pos: int = 0) -> list[Row]:
         return self._select(
+            # shiftleft: allow SL-SEC-01 -- table and column names pass ident() (^[a-z_][a-z0-9_]{0,62}$); every value is a bound parameter
             f"SELECT * FROM {self.d.qualify(system, table.name + '__changes')} "  # nosec B608
             f"WHERE feed_pos > {self.d.placeholder} ORDER BY feed_pos",
             (after_pos,),
@@ -157,6 +163,7 @@ class SqlSource:
 
     def copy(self, system: str, table: TableSpec, extracted_at: str) -> list[Row]:
         order = ", ".join(ident(k) for k in table.key)
+        # shiftleft: allow SL-SEC-01 -- table and column names pass ident() (^[a-z_][a-z0-9_]{0,62}$); every value is a bound parameter
         rows = self._select(f"SELECT * FROM {self.d.qualify(system, table.name + '__copy')} ORDER BY {order}")  # nosec B608
         return [r for r in rows if _same_instant(r["extracted_at"], extracted_at)]
 

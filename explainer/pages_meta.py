@@ -526,6 +526,7 @@ def meta_settings():
                 + code(PORT, r"    def settings\(self, source: str, dataset: str\)", 3,
                        "The port's own note on the missing level."))
     out += note("Gap 2: platform-scope values can be stored but are never returned",
+                # shiftleft: allow SL-SEC-01 -- prose inside an HTML note, not a SQL statement
                 "<p><code>config.load_domain</code> accepts a key in <code>platform.yaml</code> when the "
                 "dictionary has it at dataset scope or at platform scope, and stores it in "
                 "<code>config.domain_setting</code> with the scope it found. The merge keeps only dictionary "

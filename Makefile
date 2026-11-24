@@ -2,7 +2,7 @@
 # Setup: `make setup` (one-time). Then `make check` before any commit.
 # See docs/quality_gates.md.
 
-.PHONY: help setup check lint type security test smoke-test demo demo-full sbom clean install-hooks world world-api world-test engine-conformance run gold-known-answers dashboards ci-local ci-lint shiftleft ci-test explainer
+.PHONY: test-props test-model help setup check lint type security test smoke-test demo demo-full sbom clean install-hooks world world-api world-test engine-conformance run gold-known-answers dashboards ci-local ci-lint shiftleft ci-test explainer
 
 # uv handles its own venv at ./.venv; we don't activate manually.
 UV ?= uv
@@ -207,7 +207,7 @@ dashboards:
 # ---------------------------------------------------------------------------
 CI_PY ?= 3.12
 REALM ?= realms/aws-databricks
-SHIFTLEFT_SRC ?= git+https://github.com/dataagentsai/shift-left-bundle@f7da153d44628615b9dd2f8a1c681f476f5b81c2
+SHIFTLEFT_SRC ?= git+https://github.com/dataagentsai/shift-left-bundle@cb56555b15d6f1432ec221df255ddb79126a7c00
 SL = nice $(UV) run -q --no-project --python $(CI_PY) --with "shiftleft[tools] @ $(SHIFTLEFT_SRC)" shiftleft
 
 ci-local: ci-lint shiftleft ci-test
@@ -226,6 +226,7 @@ ci-lint:
 shiftleft:
 	$(SL) scan src/dataplatform --stage pr --baseline "$(REALM)/shiftleft-baseline.json" --md build/shiftleft-kernel.md
 	$(SL) scan "$(REALM)" --stage pr --md build/shiftleft-realm.md
+	$(SL) scan realms/databricks --stage pr --md build/shiftleft-databricks.md
 
 ci-test:
 	PYTHONPATH=src nice $(UV) run -q --no-project --python $(CI_PY) --with pytest --with pyyaml --with boto3 \
@@ -247,3 +248,18 @@ clean:
 explainer:
 	python3 explainer/build.py --out build/explainer
 	@echo "open build/explainer/index.html"
+
+# ---------------------------------------------------------------------------
+# Test tiers (docs/TEST-PLAN.md). The test dependencies are declared in tests/requirements-platform.txt.
+# ---------------------------------------------------------------------------
+TEST_ENV = PYTHONPATH=src nice $(UV) run -q --no-project --python 3.12 --with-requirements tests/requirements-platform.txt
+
+# The reference model against every contract case (plain Python, seconds).
+test-model:
+	$(TEST_ENV) pytest -q -p no:cacheprovider -o addopts="" tests/dataplatform/test_history_model.py
+
+# Property tests for bronze to silver history on the fast DuckDB engine: a fixed set of generated histories. More:
+# HYPOTHESIS_MAX_EXAMPLES=300; skip the slow shrink step on a long exploration: HYPOTHESIS_SHRINK=0.
+test-props:
+	$(TEST_ENV) pytest -q -p no:cacheprovider -o addopts="" --engine duckdb tests/dataplatform/test_silver_properties.py \
+		"tests/dataplatform/test_silver_stages.py::test_history_type2_more"

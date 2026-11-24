@@ -4,23 +4,33 @@ silver, gold as three tasks) and waits, then judges every layer against the worl
 the tasks saved (scripts/run_platform.py --hops job). The world stays in this one process; the platform never sees
 it."""
 import argparse
+import re
 import os
 import runpy
 import shutil
 import sys
 from pathlib import Path
 
+def word(pattern: str):
+    """An argparse type: the value must match `pattern` whole, so it can go into a name or a path."""
+    def check(value: str) -> str:
+        if not re.fullmatch(pattern, value):
+            raise argparse.ArgumentTypeError(f"{value!r} does not match {pattern}")
+        return value
+    return check
+
+
 p = argparse.ArgumentParser()
 p.add_argument("--days", default="3")
 p.add_argument("--scale", default="0.1")
 p.add_argument("--calendar", default="compressed")
 p.add_argument("--housekeeping-days", default="")
-p.add_argument("--env", default="v1")
+p.add_argument("--env", default="v1", type=word(r"[a-z][a-z0-9]{0,15}"))
 p.add_argument("--meta-instance", required=True)
 p.add_argument("--meta-database", required=True)
 p.add_argument("--platform-job-id", required=True)
 p.add_argument("--catalog-dir", default="", help="where the spec catalog slice sits (default: beside these tasks)")
-p.add_argument("--run-id", default="manual")
+p.add_argument("--run-id", default="manual", type=word(r"[A-Za-z0-9_-]{1,64}"))
 p.add_argument("--root", required=True, help="${workspace.file_path}: serverless gives a job file no __file__")
 a, _ = p.parse_known_args()
 
@@ -33,6 +43,7 @@ from pyspark.sql import SparkSession  # noqa: E402
 
 spark = SparkSession.builder.getOrCreate()
 for statement in paths.SETUP:
+    # shiftleft: allow SL-SEC-01 -- env matched [a-z][a-z0-9]{0,15} when the arguments were read: identifier characters only
     spark.sql(statement.format(env=a.env))
 
 os.environ.update(DP_CATALOG=a.catalog_dir or str(here / "_catalog"), DP_META_INSTANCE=a.meta_instance,

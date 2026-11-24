@@ -46,8 +46,10 @@ def now() -> datetime:
 
 def create_meta(spark: Any, schema: str) -> None:
     for t, cols in DDL.items():
+        # shiftleft: allow SL-SEC-01 -- schema and table names pass ident(); no values in the text
         spark.sql(f"CREATE TABLE IF NOT EXISTS {ident(schema + '.' + t)} ({cols})")
     s = ident(schema)
+    # shiftleft: allow SL-SEC-01 -- schema and table names pass ident(); no values in the text
     spark.sql(f"""CREATE OR REPLACE VIEW {s}.`evidence` AS
         SELECT r.run_id, r.day, r.status AS land_status, r.config_fingerprint, r.counts AS land_counts,
                r.message AS land_message, c.checks, c.failed, c.failed_checks

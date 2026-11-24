@@ -50,13 +50,16 @@ def step_reset() -> None:
     # Runs after the bundle is destroyed and redeployed: the old silver pipeline is gone, but its tables are still
     # registered to it, and a new pipeline may not write to another pipeline's tables. So silver is dropped too.
     for s in SCHEMAS.values():
+        # shiftleft: allow SL-SEC-01 -- names pass sd.ident(); no values in the text
         spark.sql(f"DROP SCHEMA IF EXISTS {sd.ident(s)} CASCADE")
     print("reset: dropped", list(SCHEMAS.values()))
 
 
 def step_prepare() -> None:
     for s in SCHEMAS.values():
+        # shiftleft: allow SL-SEC-01 -- names pass sd.ident(); no values in the text
         spark.sql(f"CREATE SCHEMA IF NOT EXISTS {sd.ident(s)}")
+    # shiftleft: allow SL-SEC-01 -- names pass sd.ident(); no values in the text
     spark.sql(f"CREATE VOLUME IF NOT EXISTS {sd.ident(SCHEMAS['landing'] + '.files')}")
     sd.create_meta(spark, META)
     if A.day == 1:
@@ -69,6 +72,7 @@ def step_prepare() -> None:
     if fp not in known:                     # register only when the manifest changed (idempotent)
         sd._append(spark, f"{META}.dataset_config", [(ds["source_name"], ds["dataset_name"], json.dumps(ds),
                    json.dumps(contract), fp, sd.now())], sd.DDL["dataset_config"])
+        # shiftleft: allow SL-SEC-01 -- names pass sd.ident(); no values in the text
         spark.sql(f"DELETE FROM {sd.ident(META + '.quality_rules')}")
         sd._append(spark, f"{META}.quality_rules", [(ds["source_name"], ds["dataset_name"], k, v,
                    ds["contract_version"]) for k, v in ds["quality_rules"].items()], sd.DDL["quality_rules"])
@@ -97,6 +101,7 @@ def probe_platform() -> None:
     results = []
     for table, obligation in probes.items():
         try:
+            # shiftleft: allow SL-SEC-01 -- table is one of the fixed probe names in this function, not input
             spark.sql(f"SELECT 1 FROM {table} LIMIT 1").collect()
             results.append(CheckResult(A.run_id, A.day, f"probe.{table}", obligation, True, "readable", "readable"))
         except Exception as e:  # noqa: BLE001 - a probe reports whatever the platform says
@@ -123,7 +128,11 @@ def step_finish() -> None:
     cfg = sd.SparkMeta(spark, META).dataset_config("shop_db", "orders")
     ds = cfg["dataset"]
     tz = ds["config"].get("schedule_timezone", "UTC")
+    import re
+    if not re.fullmatch(r"[A-Za-z0-9_+\-]+(/[A-Za-z0-9_+\-]+){0,2}", tz):
+        raise ValueError(f"not a time zone name: {tz!r}")
     silver, gold = sd.ident(ds["silver_table"]), sd.ident(ds["gold_table"])
+    # shiftleft: allow SL-SEC-01 -- gold and silver pass sd.ident(); tz matched a time-zone pattern just above
     spark.sql(f"""CREATE OR REPLACE TABLE {gold} AS
         SELECT to_date(from_utc_timestamp(order_ts, '{tz}')) AS order_date, COUNT(*) AS orders,
                ROUND(SUM(amount), 2) AS amount

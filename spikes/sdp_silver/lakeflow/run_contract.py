@@ -52,6 +52,7 @@ with tempfile.TemporaryDirectory() as tmp:
         print(f"round {r} applied")
 ok = True
 for case, _, want in CASES:
+    # shiftleft: allow SL-SEC-01 -- spike: case names come from the fixed CASES list through slug()
     rows = sql(f"SELECT k, v, __START_AT, __END_AT FROM dev_silver.spike_contract.c_{slug(case)}")
     got = normalise_closed(rows, "k", "v", "__START_AT", "__END_AT")
     good = got == want

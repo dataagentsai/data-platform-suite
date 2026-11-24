@@ -11,6 +11,7 @@ processes). The `spark` fixture keeps its name: the stage and build code only se
 from __future__ import annotations
 
 import os
+import time
 
 import pytest
 
@@ -23,6 +24,11 @@ def pytest_addoption(parser: pytest.Parser) -> None:
 
 
 def pytest_configure(config: pytest.Config) -> None:
+    # Python and Spark both turn a timestamp into a local clock time. Two stage tests failed on a machine set to IST
+    # and passed on UTC (20 Nov 2026), so the tests never read the machine's time zone: the process runs on UTC.
+    os.environ["TZ"] = "UTC"
+    if hasattr(time, "tzset"):
+        time.tzset()
     if config.getoption("--engine") == "duckdb":
         from dataplatform.adapters.duckdb_frames import activate
 
