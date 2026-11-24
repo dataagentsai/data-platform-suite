@@ -126,3 +126,123 @@ def families():
         f"The data is read from the specification catalog as of {escape(DATA['as_of'])}; the page does not update itself.",
     ])
     return out
+
+
+# ================================================================================ the integration map: every way in and out
+PRODUCTS4 = [("SAP", "#3b82c4"), ("SF", "#27a39a"), ("ORA", "#d9534f"), ("RS", "#e8923a")]
+# one row per way in: (title, subtitle, our box kind, target, [SAP, Salesforce, Oracle, Redshift]); V checked this session, K general knowledge
+INBOUND = [
+    ("Bulk export to files", "F1 F3 F4 · we start it", "solid", "landing", "KKKK"),
+    ("Query-based incremental", "F3 F6 · watermark, JDBC or API", "bx", "landing", "KKKK"),
+    ("Partner files pushed", "F1 F8 · the sender starts it", "solid", "landing", "KKKK"),
+    ("Log-based CDC", "F2 · changes with a sequence", "bx", "bronze", "KKKN"),
+    ("Event streams", "F7 · continuous, at least once", "bx", "bronze", "KKKN"),
+    ("Managed ingestion connectors", "F6 F2 · vendor pipeline writes tables", "bxm", "bronze", "KVKK"),
+    ("Zero-copy sharing", "F5 · shared tables, nothing moves", "bxm", "shared", "VVNN"),
+    ("Query federation", "F4 · queried in place, virtual", "bxm", "federated", "NVKK"),
+    ("Open tables on shared storage", "F5 · the vendor writes Iceberg", "bxm", "foreign", "NNNV"),
+]
+OUTBOUND = [
+    ("BI and SQL", "Power BI, Tableau, notebooks", "bx", "semantic"), ("AI and Genie", "questions in plain language, models", "bxm", "semantic"),
+    ("Delta Sharing out, clean rooms", "share gold, combine without exposing rows", "bxm", "gold"),
+    ("Open table interop", "Iceberg REST, UniForm: others read gold", "bxm", "gold"), ("File exports", "Parquet or CSV to storage", "bxm", "gold"),
+    ("Reverse ETL", "write results back to applications", "bxm", "gold"), ("Events published", "business events to other systems", "bxm", "gold"),
+]
+
+
+def badge(x, y, state, color):
+    if state == "N":
+        return f'<circle cx="{x}" cy="{y}" r="4" fill="#bbb"/>'
+    fill = color if state == "V" else "#ffffff"
+    return f'<circle cx="{x}" cy="{y}" r="11" fill="{fill}" stroke="{color}" stroke-width="3"/>'
+
+
+def integration_picture():
+    d = text(20, 22, "Ways in (each a family of routes)", "tx") + text(535, 22, "Databricks: one governance layer", "tx")
+    d += text(1135, 22, "Ways out", "tx")
+    for j, (name, color) in enumerate(PRODUCTS4):
+        d += f'<text x="{372 + j * 34}" y="40" font-size="14" fill="{color}" text-anchor="middle" font-weight="bold">{name}</text>'
+    d += '<rect x="520" y="48" width="560" height="816" rx="18" fill="#f6f1e4" stroke="#222" stroke-width="3"/>'
+    d += text(835, 70, "Physical: we store and own it", "tx")
+    d += '<rect x="530" y="566" width="262" height="292" rx="12" fill="none" stroke="#555" stroke-width="2" stroke-dasharray="7 6"/>'
+    d += text(542, 584, "Virtual: nothing copied", "tx")
+    target = {"landing": (835, 90, 235, 70, "Landing", "files and a manifest", "solid"),
+              "bronze": (835, 330, 235, 100, "Bronze", "pointer, changes or full", "solid"),
+              "silver": (835, 480, 235, 80, "Silver", "derive or conform", "solid"),
+              "gold": (835, 610, 235, 80, "Gold", "materialized, we own it", "solid"),
+              "semantic": (835, 722, 235, 70, "Semantic", "metric views", "solid"),
+              "shared": (542, 596, 238, 70, "Shared catalog", "read-only, pinned version", "bxm"),
+              "federated": (542, 682, 238, 70, "Federated catalog", "query in place", "bxm"),
+              "foreign": (542, 768, 238, 70, "Foreign catalog", "open tables, Iceberg REST", "bxm")}
+    for key, (x, y, w, h, t, s, k) in target.items():
+        d += box(x, y, w, h, t, s, k)
+    for a, b in (("landing", "bronze"), ("bronze", "silver"), ("silver", "gold"), ("gold", "semantic")):
+        xa, ya, _, ha, *_ = target[a]
+        _, yb, *_ = target[b]
+        d += arrow(952, ya + ha + 1, 952, yb - 1)
+    for i, (title, sub, kind, tgt, marks) in enumerate(INBOUND):
+        y = 48 + i * 88
+        d += box(20, y, 335, 74, title, sub, kind)
+        for j, ((_, color), m) in enumerate(zip(PRODUCTS4, marks)):
+            d += badge(372 + j * 34, y + 37, m, color)
+        tx, ty, tw, th, *_ = target[tgt]
+        spread = [0, 18, 36][i % 3] if tgt in ("landing", "bronze") else 35
+        d += arrow(460, y + 37, tx - 2, ty + 14 + spread)
+    for k in ("shared", "federated", "foreign"):
+        _, yy, *_ = target[k]
+        d += arrow(782, yy + 35, 833, 630 + ["shared", "federated", "foreign"].index(k) * 22)
+    for i, (title, sub, kind, src) in enumerate(OUTBOUND):
+        y = 48 + i * 116
+        d += box(1135, y, 350, 84, title, sub, kind)
+        sx, sy, sw, sh, *_ = target[src]
+        d += arrow(1082, sy + 20 + (i % 4) * 12, 1133, y + 42)
+    d += text(20, 884, "Filled circle: a route checked against the vendor's documentation this session. Hollow: general knowledge, verify. Grey dot: none known.", "tx")
+    d += text(20, 906, "Dark box: built and run for real. Plain: built, or run only on fakes. Dashed: not built.", "tx")
+    return d
+
+
+PLACEMENTS = [
+    ["A", "Query in place", "Nothing stored. Each query reads the source.", "None", "None", "Not built"],
+    ["B", "Shared in place (virtual silver)", "Nothing stored. Reads a shared table at a pinned version, behind the input gate.", "None", "Provider's history only", "Gate built (P1). Rest not built"],
+    ["C", "Pointer bronze", "Only the version, row count and checksum per batch.", "None", "Provider's history only", "Not built"],
+    ["D", "Changes-only bronze", "The change rows for a retention window, plus a baseline.", "Small", "Inside the window", "Partly: retention and baseline exist"],
+    ["E", "Full bronze", "Landing plus a bronze copy of the raw rows.", "Full", "Always", "Built and run (files, change feed). Streams on fakes"],
+    ["F", "Silver: derive", "We build the history from changes or snapshots.", "Full", "Always", "Built and run"],
+    ["G", "Silver: conform", "We keep the provider's versions and validate them.", "Full", "Always", "Built for tables we land. Not for shares"],
+]
+# way in -> the placements that make sense (A..G)
+MATRIX = {"Bulk export to files": "DEFG", "Query-based incremental": "DEFG", "Partner files pushed": "DEFG", "Log-based CDC": "DEF",
+          "Event streams": "DEF", "Managed ingestion connectors": "CEFG", "Zero-copy sharing": "BCDEFG", "Query federation": "AE",
+          "Open tables on shared storage": "BEG"}
+
+
+@page("integration-map", "The integration map: every way into and out of Databricks, and where the data can sit", parent="ingest",
+      short="Integration map", blurb="Nine ways in, seven ways out, four named products, and seven places the data can sit.")
+def integration_map():
+    out = ("<p class='lead'>This picture puts Databricks in the middle. On the left are the ways data can come in, grouped by "
+           "family, with four products placed on them. In the middle is where it can sit. On the right are the ways data "
+           "goes out. Most diagrams of this kind show only one product's side. This one shows the choices together.</p>")
+    out += fig(1500, 920, integration_picture(), "Every way into and out of Databricks",
+               "Read it left to right. Each way in lands in one place inside Databricks. The four coloured circles say which of "
+               "SAP, Salesforce, Oracle and Redshift offer that route. Gold feeds every way out.")
+    out += ("<p>SAP, Salesforce, Oracle and Redshift are examples. The same rows apply to any product in those families. "
+            "A circle is only filled where the route was checked against the vendor's current documentation: SAP and Salesforce "
+            "zero-copy sharing, Salesforce's managed connector, Salesforce's query federation, and Redshift writing Iceberg tables. "
+            "Everything else is from general knowledge and should be checked before it is promised.</p>")
+    out += "<h2>Where the data can sit</h2>"
+    out += table(["", "Placement", "What it means", "Copy kept", "Can we replay?", "Our status"], [[f"<b>{r[0]}</b>"] + [escape(c) for c in r[1:]] for r in PLACEMENTS])
+    out += ("<p>Gold is not on this list because it is always materialized in our own tables. It is the small, optimized meeting "
+            "place where virtual and physical inputs are joined. Publishing it safely is the subject of "+link("gold-wap")+".</p>")
+    out += "<h2>Which placements make sense for which way in</h2>"
+    heads = ["Way in"] + [f"{p[0]}" for p in PLACEMENTS]
+    rows = [[escape(name)] + ["✓" if p[0] in marks else "" for p in PLACEMENTS] for name, marks in MATRIX.items()]
+    out += table(heads, rows)
+    out += ("<p>A tick means the combination makes sense, not that it is built. For example, federation can only be query in place "
+            "(A), or an extract that becomes a full copy (E). A shared table can sit in any of the six placements from B to G.</p>")
+    out += not_built([
+        "The shared catalog, federated catalog and foreign-catalog placements are not built. Only the input gate for a shared table exists.",
+        "The ways out are mostly not built. Metric views ran on Azure and Databricks Free Edition. Sharing out, open-table interop, exports, reverse ETL and published events are designs.",
+        "Managed connectors, federation and CDC capture are not wired to the platform.",
+        "I have not seen a published diagram that combines ways in, placements and products like this one. Vendors draw their own side, so treat it as our own synthesis, not a standard.",
+    ])
+    return out
